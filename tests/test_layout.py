@@ -101,3 +101,18 @@ class TestMultiStruct:
             };
         """)
         assert sl.size == 16
+
+
+class TestFlexibleArrayMember:
+    def test_fam_offset_and_zero_size(self):
+        sl = layout_of("""
+            typedef struct node {
+                sds ele;
+                double score;
+                struct node *backward;
+                struct level { struct node *fwd; unsigned long span; } lvl[];
+            } node;
+        """, "node")
+        assert sl.size == 24
+        f = field(sl, "lvl")
+        assert f.offset == 24 and f.size == 0

@@ -96,10 +96,15 @@ def _emit_probe_c(snippet: Snippet) -> str:
                     "    }",
                 ]
             else:
-                lines.append(
-                    f'    printf("FIELD {f.name} %zu %zu\\n", '
-                    f"offsetof({tag}, {f.name}), "
-                    f"sizeof((({tag} *)0)->{f.name}));")
+                if f.array_len == 0:  # flexible array member: sizeof is invalid
+                    lines.append(
+                        f'    printf("FIELD {f.name} %zu 0\\n", '
+                        f"offsetof({tag}, {f.name}));")
+                else:
+                    lines.append(
+                        f'    printf("FIELD {f.name} %zu %zu\\n", '
+                        f"offsetof({tag}, {f.name}), "
+                        f"sizeof((({tag} *)0)->{f.name}));")
     lines += ["    return 0;", "}"]
     return "\n".join(lines)
 

@@ -60,6 +60,7 @@ class Segment:
     width_bits: int
     is_padding: bool = False
     is_bitfield: bool = False
+    is_flex: bool = False
 
     @property
     def bytes_str(self) -> str:
@@ -77,6 +78,9 @@ def segments_from_layout(sl: StructLayout, opts: RenderOptions) -> list[Segment]
                 label = f"{f.name}:{f.bit_width}"
             segs.append(Segment(label, f.bit_offset, f.bit_width or 0,
                                 is_bitfield=True))
+        elif f.size == 0 and not f.is_padding:
+            # flexible array member: nominal 1-byte box dangling past the end
+            segs.append(Segment(f.name + "[]", f.offset * 8, 8, is_flex=True))
         else:
             name = ("*" + f.name) if f.is_pointer and not f.name.startswith("*") else f.name
             segs.append(Segment("pad" if f.is_padding else name,
@@ -172,6 +176,7 @@ def _style_block(theme: dict) -> str:
   .fd-title   {{ fill: var(--fd-text, {t['text']}); }}
   .fd-field   {{ fill: var(--fd-field, {t['field']}); stroke: var(--fd-border, {t['border']}); stroke-width: 1; }}
   .fd-pad     {{ fill: url(#fd-hatch); stroke: var(--fd-pad-stroke, {t['pad-stroke']}); stroke-width: 1; }}
+  .fd-flex    {{ fill: none; stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; stroke-dasharray: 4 3; }}
   .fd-label   {{ fill: var(--fd-field-text, {t['field-text']}); }}
   .fd-padlbl  {{ fill: var(--fd-muted, {t['muted']}); }}
   .fd-callout {{ fill: var(--fd-text, {t['text']}); }}
@@ -201,7 +206,8 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
     ppb = opts.px_per_byte
     m = opts.margin
     x0 = m
-    total_px = sl.size * ppb
+    end_bits = max([sl.size * 8] + [g.start_bits + g.width_bits for g in segments_from_layout(sl, opts)])
+    total_px = end_bits / 8 * ppb
     segs = segments_from_layout(sl, opts)
 
     inline, callouts, runs = plan_labels(segs, opts, x0)
@@ -225,7 +231,7 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
     for seg in segs:
         x = x0 + seg.start_bits / 8 * ppb
         w = seg.width_bits / 8 * ppb
-        cls = "fd-pad" if seg.is_padding else "fd-field"
+        cls = "fd-pad" if seg.is_padding else ("fd-flex" if seg.is_flex else "fd-field")
         parts.append(f'<rect class="{cls}" x="{x:.1f}" y="{bar_top:.1f}" '
                      f'width="{w:.1f}" height="{opts.bar_height}" rx="{opts.corner_radius}"/>')
     for seg, txt in inline:
