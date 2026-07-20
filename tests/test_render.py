@@ -1,0 +1,162 @@
+"""Stage 2 tests: renderer geometry invariants.
+
+Rather than pixel-matching, we parse the emitted SVG and assert invariants:
+  - segments tile the bar exactly (no gaps/overlaps, full struct width)
+  - callout labels never overlap horizontally
+  - no two leader lines intersect or share a horizontal run
+"""
+
+import re
+
+import pytest
+
+from fieldday.cparse import parse_snippet
+from fieldday.probe import compute_layouts
+from fieldday.render import RenderOptions, render_struct
+
+
+def render(snippet, **kw):
+    sl = compute_layouts(parse_snippet(snippet))[0]
+    return render_struct(sl, RenderOptions(**kw))
+
+
+def rects(svg, cls):
+    out = []
+    for m in re.finditer(r'<rect class="(fd-field|fd-pad)" x="(-?[\d.]+)" y="(-?[\d.]+)" '
+                         r'width="(-?[\d.]+)"', svg):
+        if m.group(1) == cls or cls == "*":
+            out.append((float(m.group(2)), float(m.group(4))))
+    return out
+
+
+def leader_segments(svg):
+    """Extract leader polylines as lists of (x1,y1,x2,y2) segments."""
+    segs = []
+    for m in re.finditer(r'<path class="fd-leader" d="M (-?[\d.]+) (-?[\d.]+) '
+                         r'V (-?[\d.]+) H (-?[\d.]+) V (-?[\d.]+)"', svg):
+        x1, y1, ey, tx, by = map(float, m.groups())
+        segs.append([(x1, y1, x1, ey), (x1, ey, tx, ey), (tx, ey, tx, by)])
+    for m in re.finditer(r'<line class="fd-leader" x1="(-?[\d.]+)" y1="(-?[\d.]+)" '
+                         r'x2="(-?[\d.]+)" y2="(-?[\d.]+)"', svg):
+        x1, y1, x2, y2 = map(float, m.groups())
+        segs.append([(x1, y1, x2, y2)])
+    return segs
+
+
+def callout_labels(svg):
+    out = []
+    for m in re.finditer(r'<text class="fd-callout" x="(-?[\d.]+)" y="(-?[\d.]+)" '
+                         r'font-size="(\d+)"[^>]*>([^<]+)</text>', svg):
+        x, y, size, text = float(m.group(1)), float(m.group(2)), int(m.group(3)), m.group(4)
+        w = len(text) * size * 0.62
+        out.append((x - w / 2, x + w / 2, text))
+    return out
+
+
+def _segs_intersect(a, b, eps=0.01):
+    """Axis-aligned segment intersection (excluding shared endpoints)."""
+    ax1, ay1, ax2, ay2 = a
+    bx1, by1, bx2, by2 = b
+    a_vert, b_vert = abs(ax1 - ax2) < eps, abs(bx1 - bx2) < eps
+    if a_vert == b_vert:  # parallel: check overlap on shared axis line
+        if a_vert:
+            if abs(ax1 - bx1) > eps:
+                return False
+            lo1, hi1 = sorted((ay1, ay2)); lo2, hi2 = sorted((by1, by2))
+        else:
+            if abs(ay1 - by1) > eps:
+                return False
+            lo1, hi1 = sorted((ax1, ax2)); lo2, hi2 = sorted((bx1, bx2))
+        return hi1 - eps > lo2 and hi2 - eps > lo1
+    if b_vert:
+        a, b = b, a
+        ax1, ay1, ax2, ay2 = a
+        bx1, by1, bx2, by2 = b
+    # a vertical, b horizontal
+    lo, hi = sorted((ay1, ay2))
+    xlo, xhi = sorted((bx1, bx2))
+    return (xlo + eps < ax1 < xhi - eps) and (lo + eps < by1 < hi - eps)
+
+
+NASTY_SNIPPETS = {
+    "adjacent_bytes": """
+        struct s { uint64_t a; uint8_t resp; uint8_t argc; uint8_t vers;
+                   uint8_t mode; void *p; };
+    """,
+    "clustered_right": """
+        struct s { uint64_t a; uint64_t b; uint64_t c;
+                   uint8_t x; uint8_t y; uint8_t z; uint8_t w; };
+    """,
+    "clustered_left": """
+        struct s { uint8_t x; uint8_t y; uint8_t z; uint8_t w;
+                   uint64_t a; uint64_t b; uint64_t c; };
+    """,
+    "bitfield_swarm": """
+        struct s { unsigned alpha : 3; unsigned beta : 2; unsigned gamma : 5;
+                   unsigned delta : 6; uint64_t tail; };
+    """,
+    "two_runs": """
+        struct s { uint8_t aa; uint8_t bb; uint64_t mid;
+                   uint16_t cc; uint16_t dd; uint64_t end; };
+    """,
+}
+
+
+class TestBarTiling:
+    def test_segments_tile_bar(self):
+        svg = render("struct s { char c; long l; short h; };", px_per_byte=10, margin=20)
+        boxes = sorted(rects(svg, "*"))
+        cursor = boxes[0][0]
+        for x, w in boxes:
+            assert abs(x - cursor) < 0.05, "gap or overlap in bar tiling"
+            cursor = x + w
+        assert abs(cursor - boxes[0][0] - 24 * 10) < 0.05  # struct is 24B
+
+
+class TestCalloutGeometry:
+    @pytest.mark.parametrize("name", list(NASTY_SNIPPETS))
+    def test_labels_do_not_overlap(self, name):
+        svg = render(NASTY_SNIPPETS[name])
+        spans = sorted(callout_labels(svg))
+        for (l1, r1, t1), (l2, r2, t2) in zip(spans, spans[1:]):
+            assert r1 <= l2 + 0.05, f"labels '{t1}' and '{t2}' overlap"
+
+    @pytest.mark.parametrize("name", list(NASTY_SNIPPETS))
+    def test_labels_stay_on_canvas(self, name):
+        # regression: re-centering once pushed edge runs to negative x
+        svg = render(NASTY_SNIPPETS[name])
+        for left, right, text in callout_labels(svg):
+            assert left >= 0, f"label '{text}' pushed off-canvas (x={left})"
+
+    @pytest.mark.parametrize("name", list(NASTY_SNIPPETS))
+    def test_leaders_do_not_cross(self, name):
+        svg = render(NASTY_SNIPPETS[name])
+        leaders = leader_segments(svg)
+        for i in range(len(leaders)):
+            for j in range(i + 1, len(leaders)):
+                for sa in leaders[i]:
+                    for sb in leaders[j]:
+                        assert not _segs_intersect(sa, sb), \
+                            f"leader {i} crosses leader {j}: {sa} x {sb}"
+
+
+class TestOptions:
+    def test_transparent_skips_bg(self):
+        svg = render("struct s { long a; };", transparent=True)
+        assert 'class="fd-bg"' not in svg
+
+    def test_theme_override_baked(self):
+        svg = render("struct s { long a; };", theme={"field": "#123456"})
+        assert "#123456" in svg
+
+    def test_css_variables_present(self):
+        svg = render("struct s { long a; };")
+        assert "var(--fd-field," in svg
+
+    def test_padding_callout_present(self):
+        svg = render("struct s { char c; long l; };")
+        assert "bytes are padding" in svg
+
+    def test_no_padding_no_callout(self):
+        svg = render("struct s { long a; long b; };")
+        assert "padding" not in svg.split("</style>")[1]
