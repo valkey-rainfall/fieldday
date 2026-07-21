@@ -1,0 +1,650 @@
+{
+  "abi": "x86_64-sysv",
+  "vectors": [
+    {
+      "name": "simple_no_padding",
+      "snippet": "struct p { long a; long b; };",
+      "expected": [
+        {
+          "name": "p",
+          "size": 16,
+          "align": 8,
+          "fields": [
+            {
+              "name": "a",
+              "offset": 0,
+              "size": 8
+            },
+            {
+              "name": "b",
+              "offset": 8,
+              "size": 8
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "interior_and_tail_padding",
+      "snippet": "struct p { char c; long l; short s; };",
+      "expected": [
+        {
+          "name": "p",
+          "size": 24,
+          "align": 8,
+          "fields": [
+            {
+              "name": "c",
+              "offset": 0,
+              "size": 1
+            },
+            {
+              "name": "pad",
+              "offset": 1,
+              "size": 7,
+              "is_padding": true
+            },
+            {
+              "name": "l",
+              "offset": 8,
+              "size": 8
+            },
+            {
+              "name": "s",
+              "offset": 16,
+              "size": 2
+            },
+            {
+              "name": "pad",
+              "offset": 18,
+              "size": 6,
+              "is_padding": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "pointer_fields",
+      "snippet": "struct p { void *ptr; int x; };",
+      "expected": [
+        {
+          "name": "p",
+          "size": 16,
+          "align": 8,
+          "fields": [
+            {
+              "name": "ptr",
+              "offset": 0,
+              "size": 8,
+              "is_pointer": true
+            },
+            {
+              "name": "x",
+              "offset": 8,
+              "size": 4
+            },
+            {
+              "name": "pad",
+              "offset": 12,
+              "size": 4,
+              "is_padding": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "char_array",
+      "snippet": "struct p { char buf[13]; long l; };",
+      "expected": [
+        {
+          "name": "p",
+          "size": 24,
+          "align": 8,
+          "fields": [
+            {
+              "name": "buf",
+              "offset": 0,
+              "size": 13
+            },
+            {
+              "name": "pad",
+              "offset": 13,
+              "size": 3,
+              "is_padding": true
+            },
+            {
+              "name": "l",
+              "offset": 16,
+              "size": 8
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "multidim_sizes",
+      "snippet": "struct p { int a[4]; short b[3]; };",
+      "expected": [
+        {
+          "name": "p",
+          "size": 24,
+          "align": 4,
+          "fields": [
+            {
+              "name": "a",
+              "offset": 0,
+              "size": 16
+            },
+            {
+              "name": "b",
+              "offset": 16,
+              "size": 6
+            },
+            {
+              "name": "pad",
+              "offset": 22,
+              "size": 2,
+              "is_padding": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "builtin_stub_alignment",
+      "snippet": "struct p { char c; sds s; };",
+      "expected": [
+        {
+          "name": "p",
+          "size": 16,
+          "align": 8,
+          "fields": [
+            {
+              "name": "c",
+              "offset": 0,
+              "size": 1
+            },
+            {
+              "name": "pad",
+              "offset": 1,
+              "size": 7,
+              "is_padding": true
+            },
+            {
+              "name": "s",
+              "offset": 8,
+              "size": 8
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "user_stub",
+      "snippet": "//@ stub mytype 12 4\nstruct p { char c; mytype m; };",
+      "expected": [
+        {
+          "name": "p",
+          "size": 16,
+          "align": 4,
+          "fields": [
+            {
+              "name": "c",
+              "offset": 0,
+              "size": 1
+            },
+            {
+              "name": "pad",
+              "offset": 1,
+              "size": 3,
+              "is_padding": true
+            },
+            {
+              "name": "m",
+              "offset": 4,
+              "size": 12
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "bitfield_packing",
+      "snippet": "struct p { unsigned a : 12; unsigned b : 1; unsigned c : 19; };",
+      "expected": [
+        {
+          "name": "p",
+          "size": 4,
+          "align": 4,
+          "fields": [
+            {
+              "name": "a",
+              "offset": 0,
+              "size": 0,
+              "bit_offset": 0,
+              "bit_width": 12
+            },
+            {
+              "name": "b",
+              "offset": 1,
+              "size": 0,
+              "bit_offset": 12,
+              "bit_width": 1
+            },
+            {
+              "name": "c",
+              "offset": 1,
+              "size": 0,
+              "bit_offset": 13,
+              "bit_width": 19
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "bitfield_overflow_unit",
+      "snippet": "struct p { unsigned a : 30; unsigned b : 10; };",
+      "expected": [
+        {
+          "name": "p",
+          "size": 8,
+          "align": 4,
+          "fields": [
+            {
+              "name": "a",
+              "offset": 0,
+              "size": 0,
+              "bit_offset": 0,
+              "bit_width": 30
+            },
+            {
+              "name": "b",
+              "offset": 4,
+              "size": 0,
+              "bit_offset": 32,
+              "bit_width": 10
+            },
+            {
+              "name": "pad",
+              "offset": 6,
+              "size": 2,
+              "is_padding": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "bitfield_after_bytes",
+      "snippet": "struct p { uint8_t t; unsigned f : 4; };",
+      "expected": [
+        {
+          "name": "p",
+          "size": 4,
+          "align": 4,
+          "fields": [
+            {
+              "name": "t",
+              "offset": 0,
+              "size": 1
+            },
+            {
+              "name": "f",
+              "offset": 1,
+              "size": 0,
+              "bit_offset": 8,
+              "bit_width": 4
+            },
+            {
+              "name": "pad",
+              "offset": 2,
+              "size": 2,
+              "is_padding": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "bitfield_then_bytes",
+      "snippet": "struct p { unsigned f : 4; uint8_t t; };",
+      "expected": [
+        {
+          "name": "p",
+          "size": 4,
+          "align": 4,
+          "fields": [
+            {
+              "name": "f",
+              "offset": 0,
+              "size": 0,
+              "bit_offset": 0,
+              "bit_width": 4
+            },
+            {
+              "name": "t",
+              "offset": 1,
+              "size": 1
+            },
+            {
+              "name": "pad",
+              "offset": 2,
+              "size": 2,
+              "is_padding": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "nested_struct",
+      "snippet": "\n        struct inner { long a; long b; };\n        struct outer { int x; struct inner in; };\n    ",
+      "expected": [
+        {
+          "name": "inner",
+          "size": 16,
+          "align": 8,
+          "fields": [
+            {
+              "name": "a",
+              "offset": 0,
+              "size": 8
+            },
+            {
+              "name": "b",
+              "offset": 8,
+              "size": 8
+            }
+          ]
+        },
+        {
+          "name": "outer",
+          "size": 24,
+          "align": 8,
+          "fields": [
+            {
+              "name": "x",
+              "offset": 0,
+              "size": 4
+            },
+            {
+              "name": "pad",
+              "offset": 4,
+              "size": 4,
+              "is_padding": true
+            },
+            {
+              "name": "in",
+              "offset": 8,
+              "size": 16,
+              "struct_ref": "inner"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "typedef_struct",
+      "snippet": "typedef struct { int a; char b; } tiny;",
+      "expected": [
+        {
+          "name": "tiny",
+          "size": 8,
+          "align": 4,
+          "fields": [
+            {
+              "name": "a",
+              "offset": 0,
+              "size": 4
+            },
+            {
+              "name": "b",
+              "offset": 4,
+              "size": 1
+            },
+            {
+              "name": "pad",
+              "offset": 5,
+              "size": 3,
+              "is_padding": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "flexible_array_member",
+      "snippet": "\n        typedef struct node {\n            sds ele;\n            double score;\n            struct node *backward;\n            struct level { struct node *fwd; unsigned long span; } lvl[];\n        } node;\n    ",
+      "expected": [
+        {
+          "name": "node",
+          "size": 24,
+          "align": 8,
+          "fields": [
+            {
+              "name": "ele",
+              "offset": 0,
+              "size": 8
+            },
+            {
+              "name": "score",
+              "offset": 8,
+              "size": 8
+            },
+            {
+              "name": "backward",
+              "offset": 16,
+              "size": 8,
+              "is_pointer": true
+            },
+            {
+              "name": "lvl",
+              "offset": 24,
+              "size": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "small_types_cluster",
+      "snippet": "\n        struct s { uint64_t a; uint8_t resp; uint8_t argc; uint8_t vers;\n                   uint8_t mode; void *p; };\n    ",
+      "expected": [
+        {
+          "name": "s",
+          "size": 24,
+          "align": 8,
+          "fields": [
+            {
+              "name": "a",
+              "offset": 0,
+              "size": 8
+            },
+            {
+              "name": "resp",
+              "offset": 8,
+              "size": 1
+            },
+            {
+              "name": "argc",
+              "offset": 9,
+              "size": 1
+            },
+            {
+              "name": "vers",
+              "offset": 10,
+              "size": 1
+            },
+            {
+              "name": "mode",
+              "offset": 11,
+              "size": 1
+            },
+            {
+              "name": "pad",
+              "offset": 12,
+              "size": 4,
+              "is_padding": true
+            },
+            {
+              "name": "p",
+              "offset": 16,
+              "size": 8,
+              "is_pointer": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "valkey_robj_90",
+      "snippet": "\n        struct robj_90 {\n            unsigned type : 4;\n            unsigned encoding : 4;\n            unsigned lru : 24;\n            int refcount;\n            void *ptr;\n        };\n    ",
+      "expected": [
+        {
+          "name": "robj_90",
+          "size": 16,
+          "align": 8,
+          "fields": [
+            {
+              "name": "type",
+              "offset": 0,
+              "size": 0,
+              "bit_offset": 0,
+              "bit_width": 4
+            },
+            {
+              "name": "encoding",
+              "offset": 0,
+              "size": 0,
+              "bit_offset": 4,
+              "bit_width": 4
+            },
+            {
+              "name": "lru",
+              "offset": 1,
+              "size": 0,
+              "bit_offset": 8,
+              "bit_width": 24
+            },
+            {
+              "name": "refcount",
+              "offset": 4,
+              "size": 4
+            },
+            {
+              "name": "ptr",
+              "offset": 8,
+              "size": 8,
+              "is_pointer": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "valkey_robj_91",
+      "snippet": "\n        struct robj_91 {\n            unsigned type : 4;\n            unsigned encoding : 4;\n            unsigned lru : 24;\n            unsigned hasexpire : 1;\n            unsigned hasembkey : 1;\n            unsigned hasembval : 1;\n            unsigned refcount : 29;\n            void *val_ptr;\n        };\n    ",
+      "expected": [
+        {
+          "name": "robj_91",
+          "size": 16,
+          "align": 8,
+          "fields": [
+            {
+              "name": "type",
+              "offset": 0,
+              "size": 0,
+              "bit_offset": 0,
+              "bit_width": 4
+            },
+            {
+              "name": "encoding",
+              "offset": 0,
+              "size": 0,
+              "bit_offset": 4,
+              "bit_width": 4
+            },
+            {
+              "name": "lru",
+              "offset": 1,
+              "size": 0,
+              "bit_offset": 8,
+              "bit_width": 24
+            },
+            {
+              "name": "hasexpire",
+              "offset": 4,
+              "size": 0,
+              "bit_offset": 32,
+              "bit_width": 1
+            },
+            {
+              "name": "hasembkey",
+              "offset": 4,
+              "size": 0,
+              "bit_offset": 33,
+              "bit_width": 1
+            },
+            {
+              "name": "hasembval",
+              "offset": 4,
+              "size": 0,
+              "bit_offset": 34,
+              "bit_width": 1
+            },
+            {
+              "name": "refcount",
+              "offset": 4,
+              "size": 0,
+              "bit_offset": 35,
+              "bit_width": 29
+            },
+            {
+              "name": "val_ptr",
+              "offset": 8,
+              "size": 8,
+              "is_pointer": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "valkey_zskiplistnode",
+      "snippet": "\n        typedef struct zskiplistNode {\n            sds ele;\n            double score;\n            struct zskiplistNode *backward;\n            struct zskiplistLevel {\n                struct zskiplistNode *forward;\n                unsigned long span;\n            } level[];\n        } zskiplistNode;\n    ",
+      "expected": [
+        {
+          "name": "zskiplistNode",
+          "size": 24,
+          "align": 8,
+          "fields": [
+            {
+              "name": "ele",
+              "offset": 0,
+              "size": 8
+            },
+            {
+              "name": "score",
+              "offset": 8,
+              "size": 8
+            },
+            {
+              "name": "backward",
+              "offset": 16,
+              "size": 8,
+              "is_pointer": true
+            },
+            {
+              "name": "level",
+              "offset": 24,
+              "size": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
