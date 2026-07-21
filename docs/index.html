@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fieldday — C struct layout diagrams</title>
+<meta name="description" content="Generate presentation-quality SVG diagrams of C struct memory layouts — fields, padding, bitfields — right in your browser.">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header>
+  <h1>fieldday</h1>
+  <p class="tagline">C struct memory-layout diagrams — paste a struct, get a themeable SVG.
+    Layout follows x86-64 SysV rules, cross-validated against GCC.
+    <a href="https://github.com/valkey-rainfall/fieldday">GitHub</a></p>
+</header>
+
+<main>
+  <section class="pane pane-input">
+    <label for="snippet"><h2>C snippet</h2></label>
+    <textarea id="snippet" spellcheck="false" rows="16"></textarea>
+    <div id="error" class="error" hidden></div>
+
+    <details open>
+      <summary>Options</summary>
+      <div class="controls">
+        <label>Theme
+          <select id="theme">
+            <option value="valkey" selected>valkey (light)</option>
+            <option value="dark">dark</option>
+          </select>
+        </label>
+        <label>px / byte
+          <input type="number" id="ppb" value="15" min="2" max="60" step="1">
+        </label>
+        <label><input type="checkbox" id="ruler" checked> byte ruler</label>
+        <label><input type="checkbox" id="padcallout" checked> padding note</label>
+        <label><input type="checkbox" id="transparent"> transparent bg</label>
+        <label><input type="checkbox" id="responsive"> responsive (fluid width)</label>
+      </div>
+    </details>
+
+    <details>
+      <summary>Annotations <span class="hint">(applied to the selected struct)</span></summary>
+      <div class="controls controls-col">
+        <label>Title override
+          <input type="text" id="title" placeholder="e.g. Valkey 9.1: element embedded in the node">
+        </label>
+        <label>Note <span class="hint">(green savings line)</span>
+          <input type="text" id="note" placeholder="e.g. 51 bytes in 1 allocation — 15% smaller">
+        </label>
+        <label>Extras <span class="hint">(one per line: label | bytes | embedded or separate)</span>
+          <textarea id="extras" rows="3" spellcheck="false"
+            placeholder="element sds (16B + hdr) | 19 | embedded"></textarea>
+        </label>
+      </div>
+    </details>
+
+    <details>
+      <summary>Examples</summary>
+      <div class="controls" id="examples"></div>
+    </details>
+  </section>
+
+  <section class="pane pane-output">
+    <div class="output-head">
+      <h2>Preview</h2>
+      <label id="structpick-wrap" hidden>Struct
+        <select id="structpick"></select>
+      </label>
+      <span class="spacer"></span>
+      <button id="dl-svg">Download SVG</button>
+      <button id="dl-json">Download layout JSON</button>
+    </div>
+    <div id="preview"></div>
+    <p class="footnote">Unknown types? Add a stub line to the snippet:
+      <code>//@ stub robj 16 8</code> (name, size, optional alignment).
+      Layouts are x86-64 SysV; the same engine is verified in CI against
+      compiler-generated golden vectors.</p>
+  </section>
+</main>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
