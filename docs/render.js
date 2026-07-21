@@ -302,7 +302,10 @@ export function renderStruct(sl, userOpts = {}) {
   const padB = paddingBytes(sl);
   if (opts.paddingCallout && padB) {
     cy += 18;
-    const pct = Math.round(padB * 100 / sl.size);
+    // match Python round() (half-even)
+    const v = padB * 100 / sl.size;
+    let pct = Math.round(v);
+    if (Math.abs(v - Math.trunc(v) - 0.5) < 1e-9) pct = 2 * Math.round(v / 2);
     parts.push(textEl(x0, cy, `\u25bc ${padB} of ${sl.size} bytes are padding (${pct}%)`,
                       13, "fd-accent", "start", "700"));
   }
