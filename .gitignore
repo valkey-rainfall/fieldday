@@ -3,3 +3,5 @@ __pycache__/
 *.egg-info/
 *.pyc
 node_modules/
+examples/**/*.svg
+gallery/**/*.svg
