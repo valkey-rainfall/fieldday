@@ -1,10 +1,10 @@
 {
   "structs": [
     {
-      "name": "embstr_before",
+      "name": "threshold_raw",
       "size": 16,
       "align": 8,
-      "title": "Before: ptr points at the value stored just bytes away",
+      "title": "Before: a 126B value exceeds the 64B embstr limit \u2014 raw encoding, 2 allocations",
       "fields": [
         {
           "name": "type",
@@ -46,38 +46,38 @@
           "kind": "embedded"
         },
         {
-          "label": "key sds (10B + hdr)",
-          "bytes": 14,
+          "label": "key sds (16B + hdr)",
+          "bytes": 20,
           "kind": "embedded",
           "dividers": [
             3,
-            13
+            19
           ]
         },
         {
-          "label": "value sds (20B + hdr)",
-          "bytes": 24,
-          "kind": "embedded",
+          "label": "value sds (126B + hdr)",
+          "bytes": 130,
+          "kind": "separate",
           "dividers": [
             3,
-            23
+            129
           ]
         }
       ],
       "arrows": [
         {
           "from": "ptr",
-          "to": "value sds (20B + hdr)",
+          "to": "value sds (126B + hdr)",
           "to_offset": 3
         }
       ],
-      "note": "8 bytes spent pointing at data that always follows"
+      "note": "two allocations, each rounded up by jemalloc: 48B + 160B = 208B"
     },
     {
-      "name": "embstr_after",
+      "name": "threshold_embstr",
       "size": 8,
       "align": 8,
-      "title": "Valkey 9.1: the embedded data moves into the former ptr slot",
+      "title": "Valkey 9.1: the 128B threshold admits the same value \u2014 embstr, 1 allocation",
       "fields": [
         {
           "name": "type",
@@ -101,9 +101,11 @@
           "bit_width": 24
         },
         {
-          "name": "refcount",
+          "name": "flags+refcount",
           "offset": 4,
-          "size": 4
+          "size": 0,
+          "bit_offset": 32,
+          "bit_width": 32
         }
       ],
       "extras": [
@@ -113,25 +115,25 @@
           "kind": "embedded"
         },
         {
-          "label": "key sds (10B + hdr)",
-          "bytes": 14,
+          "label": "key sds (16B + hdr)",
+          "bytes": 20,
           "kind": "embedded",
           "dividers": [
             3,
-            13
+            19
           ]
         },
         {
-          "label": "value sds (20B + hdr)",
-          "bytes": 24,
+          "label": "value sds (126B + hdr)",
+          "bytes": 130,
           "kind": "embedded",
           "dividers": [
             3,
-            23
+            129
           ]
         }
       ],
-      "note": "8 bytes saved on every embstr object",
+      "note": "one allocation, one round-up: 160B \u2014 23% less memory",
       "note_style": "savings"
     }
   ]

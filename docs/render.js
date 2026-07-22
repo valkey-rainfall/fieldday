@@ -179,6 +179,23 @@ function segmentsFromLayout(sl, opts) {
 
 function textW(s, size) { return s.length * size * CHAR_W; }
 
+/** Greedy word wrap to fit maxPx at the estimated glyph width. */
+function wrapText(text, size, maxPx) {
+  const lines = [];
+  let line = "";
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    const cand = line ? line + " " + word : word;
+    if (line && textW(cand, size) > maxPx) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = cand;
+    }
+  }
+  if (line) lines.push(line);
+  return lines.length ? lines : [""];
+}
+
 function planLabels(segs, opts, x0) {
   const ppb = opts.pxPerByte;
   const inline = [];
@@ -489,33 +506,43 @@ export function renderStruct(sl, userOpts = {}) {
     cy = lane0 + (sl.arrows.length - 1) * 13 + 8;
   }
 
+  // notes wrap at the diagram's content width so they never overflow
+  const noteWrapPx = Math.max(totalPx, 260);
+  let noteMaxPx = 0;
+
   // padding callout
   const padB = paddingBytes(sl);
   if (opts.paddingCallout && padB) {
-    cy += 18;
     // match Python round() (half-even)
     const v = padB * 100 / sl.size;
     let pct = Math.round(v);
     if (Math.abs(v - Math.trunc(v) - 0.5) < 1e-9) pct = 2 * Math.round(v / 2);
-    parts.push(textEl(x0, cy, `\u25bc ${padB} of ${sl.size} bytes are padding (${pct}%)`,
-                      13, "fd-note", "start", "700"));
+    wrapText(`\u25bc ${padB} of ${sl.size} bytes are padding (${pct}%)`, 13, noteWrapPx)
+      .forEach((line, i) => {
+        cy += i === 0 ? 18 : 16;
+        noteMaxPx = Math.max(noteMaxPx, textW(line, 13));
+        parts.push(textEl(x0, cy, line, 13, "fd-note", "start", "700"));
+      });
   }
 
   // hand-annotated note: neutral by default; the savings style opts into
   // the green decrease glyph (only right when the note describes a saving)
   if (sl.note) {
-    cy += 18;
-    if (sl.note_style === "savings") {
-      parts.push(textEl(x0, cy, `\u25bc ${sl.note}`, 13, "fd-note", "start", "700"));
-    } else {
-      parts.push(textEl(x0, cy, sl.note, 13, "fd-note-plain", "start", "600"));
-    }
+    const savings = sl.note_style === "savings";
+    const text = savings ? `\u25bc ${sl.note}` : sl.note;
+    wrapText(text, 13, noteWrapPx).forEach((line, i) => {
+      cy += i === 0 ? 18 : 16;
+      noteMaxPx = Math.max(noteMaxPx, textW(line, 13));
+      parts.push(textEl(x0, cy, line, 13, savings ? "fd-note" : "fd-note-plain",
+                        "start", savings ? "700" : "600"));
+    });
   }
 
   // canvas must fit callout labels and title, not just the bar
   let contentRight = x0 + totalPx;
   for (const c of callouts) contentRight = Math.max(contentRight, c.labelX + c.width / 2);
   if (title) contentRight = Math.max(contentRight, x0 + textW(title, 15));
+  contentRight = Math.max(contentRight, x0 + noteMaxPx);
   const width = Math.trunc(contentRight + m);
   const height = Math.trunc(cy + m / 2);
   const bg = opts.transparent ? "" : '<rect class="fd-background" width="100%" height="100%" rx="8"/>\n';

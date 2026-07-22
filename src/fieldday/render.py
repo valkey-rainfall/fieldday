@@ -202,6 +202,22 @@ def _text_w(s: str, size: float) -> float:
     return len(s) * size * CHAR_W
 
 
+def _wrap_text(text: str, size: float, max_px: float) -> list:
+    """Greedy word wrap to fit max_px at the estimated glyph width."""
+    lines = []
+    line = ""
+    for word in text.split():
+        cand = f"{line} {word}".strip()
+        if line and _text_w(cand, size) > max_px:
+            lines.append(line)
+            line = word
+        else:
+            line = cand
+    if line:
+        lines.append(line)
+    return lines or [""]
+
+
 def plan_labels(segs: list[Segment], opts: RenderOptions, x0: float):
     """Split segments into inline-labeled and callouts; declutter callouts."""
     ppb = opts.px_per_byte
@@ -492,22 +508,31 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
                 f'{tx:.1f},{bar_bottom + 1:.1f}"/>')
         cy = lane0 + (len(sl.arrows) - 1) * 13 + 8
 
+    # notes wrap at the diagram's content width so they never overflow
+    note_wrap_px = max(total_px, 260)
+    note_max_px = 0.0
+
     # padding callout
     pad_b = sl.padding_bytes
     if opts.padding_callout and pad_b:
-        cy += 18
         pct = round(pad_b * 100 / sl.size)
-        parts.append(_text(x0, cy, f"\u25bc {pad_b} of {sl.size} bytes are padding ({pct}%)",
-                           13, "fd-note", "start", "700"))
+        for i, line in enumerate(_wrap_text(
+                f"\u25bc {pad_b} of {sl.size} bytes are padding ({pct}%)", 13, note_wrap_px)):
+            cy += 18 if i == 0 else 16
+            note_max_px = max(note_max_px, _text_w(line, 13))
+            parts.append(_text(x0, cy, line, 13, "fd-note", "start", "700"))
 
     # hand-annotated note: neutral by default; the savings style opts into
     # the green decrease glyph (only right when the note describes a saving)
     if sl.note:
-        cy += 18
         if getattr(sl, "note_style", "plain") == "savings":
-            parts.append(_text(x0, cy, f"\u25bc {sl.note}", 13, "fd-note", "start", "700"))
+            text, cls, weight = f"\u25bc {sl.note}", "fd-note", "700"
         else:
-            parts.append(_text(x0, cy, sl.note, 13, "fd-note-plain", "start", "600"))
+            text, cls, weight = sl.note, "fd-note-plain", "600"
+        for i, line in enumerate(_wrap_text(text, 13, note_wrap_px)):
+            cy += 18 if i == 0 else 16
+            note_max_px = max(note_max_px, _text_w(line, 13))
+            parts.append(_text(x0, cy, line, 13, cls, "start", weight))
 
     # canvas must fit callout labels and title, not just the bar
     content_right = x0 + total_px
@@ -515,6 +540,7 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
         content_right = max(content_right, c.label_x + c.width / 2)
     if title:
         content_right = max(content_right, x0 + _text_w(title, 15))
+    content_right = max(content_right, x0 + note_max_px)
     width = int(content_right + m)
     height = int(cy + m / 2)
     bg = "" if opts.transparent else f'<rect class="fd-background" width="100%" height="100%" rx="8"/>\n'
