@@ -1,0 +1,40 @@
+{
+  "structs": [
+    {
+      "name": "embstr_before",
+      "size": 16,
+      "align": 8,
+      "title": "Before: ptr points at the string stored 8 bytes away",
+      "fields": [
+        {"name": "type", "offset": 0, "size": 0, "bit_offset": 0, "bit_width": 4},
+        {"name": "encoding", "offset": 0, "size": 0, "bit_offset": 4, "bit_width": 4},
+        {"name": "lru", "offset": 1, "size": 0, "bit_offset": 8, "bit_width": 24},
+        {"name": "refcount", "offset": 4, "size": 4},
+        {"name": "ptr", "offset": 8, "size": 8, "is_pointer": true}
+      ],
+      "extras": [
+        {"label": "embedded string (sds)", "bytes": 24, "kind": "embedded"}
+      ],
+      "arrows": [
+        {"from": "ptr", "to": "embedded string (sds)"}
+      ],
+      "note": "the pointer spends 8 bytes to point at data that always follows it"
+    },
+    {
+      "name": "embstr_after",
+      "size": 8,
+      "align": 8,
+      "title": "Valkey 9.1: the string moves into the former ptr slot",
+      "fields": [
+        {"name": "type", "offset": 0, "size": 0, "bit_offset": 0, "bit_width": 4},
+        {"name": "encoding", "offset": 0, "size": 0, "bit_offset": 4, "bit_width": 4},
+        {"name": "lru", "offset": 1, "size": 0, "bit_offset": 8, "bit_width": 24},
+        {"name": "refcount", "offset": 4, "size": 4}
+      ],
+      "extras": [
+        {"label": "embedded string (sds)", "bytes": 24, "kind": "embedded"}
+      ],
+      "note": "8 bytes saved on every embstr object"
+    }
+  ]
+}

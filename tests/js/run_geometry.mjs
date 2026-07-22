@@ -231,6 +231,16 @@ check("bitfield_unit_padding_tiled", () => {
   assert(Math.abs(cursor - boxes[0][0] - 24 * 16) < 0.11, "bar does not span struct");
 });
 
+
+check("pointer_arrow_rendered", () => {
+  const sl = computeLayouts("struct s { long a; };")[0];
+  sl.extras = [{ label: "data", bytes: 16, kind: "embedded" }];
+  sl.arrows = [{ from: "a", to: "data" }];
+  const svg = renderStruct(sl);
+  assert((svg.match(/class="fd-pointer-arrow"/g) || []).length === 1, "arrow missing");
+  assert((svg.match(/class="fd-pointer-head"/g) || []).length === 1, "arrowhead missing");
+});
+
 console.log(`geometry: ${pass} passed, ${fail} failed`);
 if (failures.length) {
   for (const f of failures) console.error("FAIL " + f);

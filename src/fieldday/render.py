@@ -234,6 +234,8 @@ def _style_block(theme: dict, extra_css: str = "") -> str:
   .fd-ruler-line   {{ stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; }}
   .fd-cache-line   {{ stroke: var(--fd-text, {t['text']}); stroke-width: 3; stroke-dasharray: 7 4; opacity: 0.8; }}
   .fd-cache-line-label    {{ fill: var(--fd-text, {t['text']}); }}
+  .fd-pointer-arrow  {{ stroke: var(--fd-text, {t['text']}); stroke-width: 1.5; fill: none; }}
+  .fd-pointer-head   {{ fill: var(--fd-text, {t['text']}); }}
   .fd-ruler-label    {{ fill: var(--fd-muted, {t['muted']}); }}
   .fd-note  {{ fill: var(--fd-highlight, {t['highlight']}); }}
   text        {{ font-family: var(--fd-font, {t['font']}); }}
@@ -391,6 +393,43 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
         for a_start, a_end in allocs:
             draw_ruler(a_start, a_end, 0)
         cy = ry + 26
+
+    # pointer arrows: from a member's box down below the ruler, across,
+    # and up into the start of the target member/extra (arrowhead up)
+    if sl.arrows:
+        centers = {}
+        starts = {}
+        for f in sl.fields:
+            if not f.is_padding:
+                centers[f.name] = x0 + (f.offset + max(f.size, 1) / 2) * ppb
+        for g in segs:
+            if g.is_extra:
+                centers[g.label] = x0 + (g.start_bits + g.width_bits / 2) / 8 * ppb
+                starts[g.label] = x0 + g.start_bits / 8 * ppb
+            elif not g.is_padding:
+                base = g.label.lstrip("*").split(":")[0].rstrip("[]")
+                starts.setdefault(base, x0 + g.start_bits / 8 * ppb)
+        bar_bottom = bar_top + opts.bar_height
+        lane0 = cy + 10
+        for i, arrow in enumerate(sl.arrows):
+            src, dst = arrow.get("from"), arrow.get("to")
+            fx = centers.get(src)
+            tx = starts.get(dst, centers.get(dst))
+            if fx is None or tx is None:
+                raise ValueError(
+                    f"arrow endpoint not found: {src!r} -> {dst!r} "
+                    f"(use a member name or an extra's label)")
+            if dst in starts:
+                tx += 5  # point at the start of the target, slightly inset
+            lane = lane0 + i * 13
+            parts.append(
+                f'<path class="fd-pointer-arrow" d="M {fx:.1f} {bar_bottom + 2:.1f} '
+                f'V {lane:.1f} H {tx:.1f} V {bar_bottom + 8:.1f}"/>')
+            parts.append(
+                f'<polygon class="fd-pointer-head" points="'
+                f'{tx - 4:.1f},{bar_bottom + 8:.1f} {tx + 4:.1f},{bar_bottom + 8:.1f} '
+                f'{tx:.1f},{bar_bottom + 1:.1f}"/>')
+        cy = lane0 + (len(sl.arrows) - 1) * 13 + 8
 
     # padding callout
     pad_b = sl.padding_bytes

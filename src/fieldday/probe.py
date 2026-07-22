@@ -53,6 +53,9 @@ class StructLayout:
     note: str | None = None   # savings/summary line rendered in accent color
     title: str | None = None  # hand-written diagram title
     relabel: dict = field(default_factory=dict)  # member -> custom label ('' hides)
+    arrows: list = field(default_factory=list)  # [{from, to}] pointer arrows
+                                                # drawn under the ruler; endpoints
+                                                # are member names or extra labels
 
     @property
     def padding_bytes(self) -> int:
@@ -233,6 +236,7 @@ def layouts_to_json(layouts: list[StructLayout]) -> str:
              **({"extras": s.extras} if s.extras else {}),
              **({"note": s.note} if s.note else {}),
              **({"title": s.title} if s.title else {}),
-             **({"relabel": s.relabel} if s.relabel else {})}
+             **({"relabel": s.relabel} if s.relabel else {}),
+             **({"arrows": s.arrows} if s.arrows else {})}
             for s in layouts]},
         indent=2)

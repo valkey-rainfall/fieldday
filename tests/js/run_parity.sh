@@ -14,6 +14,8 @@ for (const f of ['robj_90', 'robj_91']) {
   const d = JSON.parse(readFileSync('examples/blog91/' + f + '.json', 'utf8'));
   writeFileSync('$TMP/js_' + f + '.svg', renderStruct(d.structs[0], { pxPerByte: 10 }));
 }
+const pair594 = JSON.parse(readFileSync('examples/blog594/embstr_pair.json', 'utf8'));
+pair594.structs.forEach((s, i) => writeFileSync('$TMP/js_e594_' + i + '.svg', renderStruct(s, { pxPerByte: 14 })));
 const pair = JSON.parse(readFileSync('examples/blog91/zslnode_pair.json', 'utf8'));
 pair.structs.forEach((s, i) => writeFileSync('$TMP/js_zsl' + i + '.svg', renderStruct(s, { pxPerByte: 10 })));
 "
@@ -28,10 +30,12 @@ for f in ("robj_90", "robj_91"):
     open(f"$TMP/py_{f}.svg", "w").write(render_struct(sl, RenderOptions(px_per_byte=10)))
 for i, sl in enumerate(layouts_from_json(open("examples/blog91/zslnode_pair.json").read())):
     open(f"$TMP/py_zsl{i}.svg", "w").write(render_struct(sl, RenderOptions(px_per_byte=10)))
+for i, sl in enumerate(layouts_from_json(open("examples/blog594/embstr_pair.json").read())):
+    open(f"$TMP/py_e594_{i}.svg", "w").write(render_struct(sl, RenderOptions(px_per_byte=14)))
 EOF
 
 fail=0
-for p in robj_90 robj_91 zsl0 zsl1; do
+for p in robj_90 robj_91 zsl0 zsl1 e594_0 e594_1; do
   if cmp -s "$TMP/py_$p.svg" "$TMP/js_$p.svg"; then
     echo "parity $p: identical"
   else
