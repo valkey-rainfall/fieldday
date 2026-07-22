@@ -6,7 +6,7 @@
   "scripts": {
     "test": "node tests/js/run_vectors.mjs && node tests/js/run_geometry.mjs",
     "test:parity": "tests/js/run_parity.sh",
-    "build:editor": "esbuild tools/editor_bundle_entry.js --bundle --format=esm --minify --outfile=docs/vendor/codemirror.js"
+    "build:editor": "node tools/build_editor.mjs"
   },
   "devDependencies": {
     "@codemirror/lang-cpp": "6.0.2",
@@ -14,5 +14,6 @@
     "codemirror": "6.0.1",
     "esbuild": "0.24.2",
     "playwright-core": "1.49.1"
-  }
+  },
+  "license": "BSD-3-Clause"
 }
