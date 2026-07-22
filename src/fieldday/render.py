@@ -271,31 +271,31 @@ def _style_block(theme: dict, extra_css: str = "") -> str:
     t = {**DEFAULT_THEME, **theme}
     tail = ("\n" + extra_css.strip()) if extra_css.strip() else ""
     return f"""<style>
-  .fd-background      {{ fill: var(--fd-background, {t['background']}); }}
-  .fd-title   {{ fill: var(--fd-text, {t['text']}); }}
-  .fd-field-box   {{ fill: var(--fd-field-fill, {t['field-fill']}); stroke: var(--fd-field-border, {t['field-border']}); stroke-width: 1; }}
-  .fd-padding-box     {{ fill: url(#fd-hatch); stroke: var(--fd-padding-stroke, {t['padding-stroke']}); stroke-width: 1; }}
-  .fd-flexible-array    {{ fill: none; stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; stroke-dasharray: 4 3; }}
-  .fd-extra-box   {{ fill: var(--fd-field-fill, {t['field-fill']}); fill-opacity: 0.55; stroke: var(--fd-field-border, {t['field-border']}); stroke-width: 1; stroke-dasharray: 5 3; }}
-  .fd-slack-box   {{ fill: var(--fd-muted, {t['muted']}); fill-opacity: 0.10; stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; stroke-dasharray: 2 3; }}
-  .fd-slack-label {{ fill: var(--fd-muted, {t['muted']}); }}
-  .fd-allocation-plus    {{ fill: var(--fd-muted, {t['muted']}); }}
-  .fd-field-label   {{ fill: var(--fd-field-text, {t['field-text']}); }}
-  .fd-padding-label  {{ fill: var(--fd-muted, {t['muted']}); }}
-  .fd-callout-label {{ fill: var(--fd-text, {t['text']}); }}
-  .fd-leader-line  {{ stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; fill: none; }}
-  .fd-ruler-line   {{ stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; }}
-  .fd-cache-line   {{ stroke: var(--fd-text, {t['text']}); stroke-width: 3; stroke-dasharray: 7 4; opacity: 0.8; }}
-  .fd-cache-line-label    {{ fill: var(--fd-text, {t['text']}); }}
-  .fd-pointer-arrow  {{ stroke: var(--fd-text, {t['text']}); stroke-width: 1.5; fill: none; }}
-  .fd-pointer-head   {{ fill: var(--fd-text, {t['text']}); }}
-  .fd-ruler-label    {{ fill: var(--fd-muted, {t['muted']}); }}
-  .fd-note  {{ fill: var(--fd-highlight, {t['highlight']}); }}
-  .fd-note-plain {{ fill: var(--fd-text, {t['text']}); }}
-  text        {{ font-family: var(--fd-font, {t['font']}); }}
-  .fd-hatch-background {{ fill: var(--fd-padding-fill, {t['padding-fill']}); }}
-  .fd-hatch-lines {{ stroke: var(--fd-padding-stroke, {t['padding-stroke']}); stroke-width: 1.5; }}
-  .fd-subdivision-line  {{ stroke: var(--fd-field-text, {t['field-text']}); stroke-width: 1; stroke-dasharray: 2 3; opacity: 0.45; }}{tail}
+  .fd-background      {{ fill: {t['background']}; fill: var(--fd-background, {t['background']}); }}
+  .fd-title   {{ fill: {t['text']}; fill: var(--fd-text, {t['text']}); }}
+  .fd-field-box   {{ fill: {t['field-fill']}; fill: var(--fd-field-fill, {t['field-fill']}); stroke: {t['field-border']}; stroke: var(--fd-field-border, {t['field-border']}); stroke-width: 1; }}
+  .fd-padding-box     {{ fill: url(#fd-hatch); stroke: {t['padding-stroke']}; stroke: var(--fd-padding-stroke, {t['padding-stroke']}); stroke-width: 1; }}
+  .fd-flexible-array    {{ fill: none; stroke: {t['muted']}; stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; stroke-dasharray: 4 3; }}
+  .fd-extra-box   {{ fill: {t['field-fill']}; fill: var(--fd-field-fill, {t['field-fill']}); fill-opacity: 0.55; stroke: {t['field-border']}; stroke: var(--fd-field-border, {t['field-border']}); stroke-width: 1; stroke-dasharray: 5 3; }}
+  .fd-slack-box   {{ fill: {t['muted']}; fill: var(--fd-muted, {t['muted']}); fill-opacity: 0.10; stroke: {t['muted']}; stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; stroke-dasharray: 2 3; }}
+  .fd-slack-label {{ fill: {t['muted']}; fill: var(--fd-muted, {t['muted']}); }}
+  .fd-allocation-plus    {{ fill: {t['muted']}; fill: var(--fd-muted, {t['muted']}); }}
+  .fd-field-label   {{ fill: {t['field-text']}; fill: var(--fd-field-text, {t['field-text']}); }}
+  .fd-padding-label  {{ fill: {t['muted']}; fill: var(--fd-muted, {t['muted']}); }}
+  .fd-callout-label {{ fill: {t['text']}; fill: var(--fd-text, {t['text']}); }}
+  .fd-leader-line  {{ stroke: {t['muted']}; stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; fill: none; }}
+  .fd-ruler-line   {{ stroke: {t['muted']}; stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; }}
+  .fd-cache-line   {{ stroke: {t['text']}; stroke: var(--fd-text, {t['text']}); stroke-width: 3; stroke-dasharray: 7 4; opacity: 0.8; }}
+  .fd-cache-line-label    {{ fill: {t['text']}; fill: var(--fd-text, {t['text']}); }}
+  .fd-pointer-arrow  {{ stroke: {t['text']}; stroke: var(--fd-text, {t['text']}); stroke-width: 1.5; fill: none; }}
+  .fd-pointer-head   {{ fill: {t['text']}; fill: var(--fd-text, {t['text']}); }}
+  .fd-ruler-label    {{ fill: {t['muted']}; fill: var(--fd-muted, {t['muted']}); }}
+  .fd-note  {{ fill: {t['highlight']}; fill: var(--fd-highlight, {t['highlight']}); }}
+  .fd-note-plain {{ fill: {t['text']}; fill: var(--fd-text, {t['text']}); }}
+  text        {{ font-family: {t['font']}; font-family: var(--fd-font, {t['font']}); }}
+  .fd-hatch-background {{ fill: {t['padding-fill']}; fill: var(--fd-padding-fill, {t['padding-fill']}); }}
+  .fd-hatch-lines {{ stroke: {t['padding-stroke']}; stroke: var(--fd-padding-stroke, {t['padding-stroke']}); stroke-width: 1.5; }}
+  .fd-subdivision-line  {{ stroke: {t['field-text']}; stroke: var(--fd-field-text, {t['field-text']}); stroke-width: 1; stroke-dasharray: 2 3; opacity: 0.45; }}{tail}
 </style>"""
 
 

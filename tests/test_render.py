@@ -329,3 +329,19 @@ class TestAnnotations:
             "struct s { long a; struct lv { long f; } lvl[]; };"))[0]
         svg = render_struct(sl, RenderOptions(jemalloc_slack=True))
         assert "fd-slack-box" not in svg.split("</style>")[1]
+
+    def test_css_survives_var_unsupported_renderers(self):
+        # macOS Preview / Inkscape drop var() declarations as invalid and
+        # fall back to SVG's default black fill. Every var() declaration
+        # must be immediately preceded by a baked declaration of the same
+        # property so legacy renderers keep the theme color.
+        import re as _re
+        svg = render_struct(
+            __import__("fieldday.probe", fromlist=["compute_layouts"]).compute_layouts(
+                __import__("fieldday.cparse", fromlist=["parse_snippet"]).parse_snippet(
+                    "struct s { long a; };"))[0], RenderOptions())
+        style = svg.split("<style>")[1].split("</style>")[0]
+        for m in _re.finditer(r"(fill|stroke|font-family): var\((--fd-[a-z-]+), ([^)]+)\)", style):
+            prop, _, val = m.groups()
+            assert f"{prop}: {val}; {prop}: var(" in style, \
+                f"var() declaration for {prop} lacks a baked fallback: {m.group(0)}"
