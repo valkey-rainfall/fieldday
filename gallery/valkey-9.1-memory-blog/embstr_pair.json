@@ -70,8 +70,7 @@
           "to": "value sds (20B + hdr)",
           "to_offset": 3
         }
-      ],
-      "note": "ptr locates the first content byte, just past the value's sds header \u2014 8 bytes spent pointing at data that always follows"
+      ]
     },
     {
       "name": "embstr_after",

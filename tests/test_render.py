@@ -330,6 +330,16 @@ class TestAnnotations:
         svg = render_struct(sl, RenderOptions(jemalloc_slack=True))
         assert "fd-slack-box" not in svg.split("</style>")[1]
 
+    def test_long_notes_wrap_within_canvas(self):
+        import re as _re
+        sl = self._layout(note="a very long observation " * 8)
+        svg = render_struct(sl, RenderOptions())
+        m = _re.search(r'viewBox="0 0 (\d+)', svg)
+        width = int(m.group(1))
+        notes = _re.findall(r'class="fd-note-plain"[^>]*>([^<]+)<', svg)
+        assert len(notes) > 1  # wrapped into multiple lines
+        from fieldday.render import _text_w
+        assert all(24 + _text_w(t, 13) <= width for t in notes)
     def test_css_survives_var_unsupported_renderers(self):
         # macOS Preview / Inkscape drop var() declarations as invalid and
         # fall back to SVG's default black fill. Every var() declaration
