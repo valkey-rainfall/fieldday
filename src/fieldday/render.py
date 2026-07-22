@@ -267,35 +267,77 @@ def _esc(s: str) -> str:
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+def _presentation_attrs(theme: dict) -> dict:
+    """class -> inline presentation attributes. Non-browser rasterizers
+    (macOS Preview, Slack thumbnails, some Inkscape paths) ignore <style>
+    blocks; presentation attributes are core SVG 1.1 and always honored.
+    Browsers still apply the <style> var() rules on top (CSS outranks
+    presentation attributes), so page-level --fd-* theming is unaffected."""
+    t = {**DEFAULT_THEME, **theme}
+    font = t["font"].replace('"', "&quot;")
+    return {
+        "fd-background": f'fill="{t["background"]}"',
+        "fd-title": f'fill="{t["text"]}" font-family="{font}"',
+        "fd-field-box": f'fill="{t["field-fill"]}" stroke="{t["field-border"]}" stroke-width="1"',
+        "fd-padding-box": f'fill="url(#fd-hatch)" stroke="{t["padding-stroke"]}" stroke-width="1"',
+        "fd-flexible-array": f'fill="none" stroke="{t["muted"]}" stroke-width="1" stroke-dasharray="4 3"',
+        "fd-extra-box": f'fill="{t["field-fill"]}" fill-opacity="0.55" stroke="{t["field-border"]}" stroke-width="1" stroke-dasharray="5 3"',
+        "fd-slack-box": f'fill="{t["muted"]}" fill-opacity="0.10" stroke="{t["muted"]}" stroke-width="1" stroke-dasharray="2 3"',
+        "fd-allocation-plus": f'fill="{t["muted"]}" font-family="{font}"',
+        "fd-field-label": f'fill="{t["field-text"]}" font-family="{font}"',
+        "fd-padding-label": f'fill="{t["muted"]}" font-family="{font}"',
+        "fd-callout-label": f'fill="{t["text"]}" font-family="{font}"',
+        "fd-leader-line": f'stroke="{t["muted"]}" stroke-width="1" fill="none"',
+        "fd-ruler-line": f'stroke="{t["muted"]}" stroke-width="1"',
+        "fd-ruler-label": f'fill="{t["muted"]}" font-family="{font}"',
+        "fd-cache-line": f'stroke="{t["text"]}" stroke-width="3" stroke-dasharray="7 4" opacity="0.8"',
+        "fd-cache-line-label": f'fill="{t["text"]}" font-family="{font}"',
+        "fd-note": f'fill="{t["highlight"]}" font-family="{font}"',
+        "fd-note-plain": f'fill="{t["text"]}" font-family="{font}"',
+        "fd-subdivision-line": f'stroke="{t["field-text"]}" stroke-width="1" stroke-dasharray="2 3" opacity="0.45"',
+        "fd-pointer-arrow": f'stroke="{t["text"]}" stroke-width="1.5" fill="none"',
+        "fd-pointer-head": f'fill="{t["text"]}"',
+        "fd-hatch-background": f'fill="{t["padding-fill"]}"',
+        "fd-hatch-lines": f'stroke="{t["padding-stroke"]}" stroke-width="1.5"',
+    }
+
+
+def _inline_presentation(svg: str, theme: dict) -> str:
+    """Inject presentation attributes next to every class= use."""
+    for cls, attrs in _presentation_attrs(theme).items():
+        svg = svg.replace(f'class="{cls}"', f'class="{cls}" {attrs}')
+    return svg
+
+
 def _style_block(theme: dict, extra_css: str = "") -> str:
     t = {**DEFAULT_THEME, **theme}
     tail = ("\n" + extra_css.strip()) if extra_css.strip() else ""
     return f"""<style>
-  .fd-background      {{ fill: var(--fd-background, {t['background']}); }}
-  .fd-title   {{ fill: var(--fd-text, {t['text']}); }}
-  .fd-field-box   {{ fill: var(--fd-field-fill, {t['field-fill']}); stroke: var(--fd-field-border, {t['field-border']}); stroke-width: 1; }}
-  .fd-padding-box     {{ fill: url(#fd-hatch); stroke: var(--fd-padding-stroke, {t['padding-stroke']}); stroke-width: 1; }}
-  .fd-flexible-array    {{ fill: none; stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; stroke-dasharray: 4 3; }}
-  .fd-extra-box   {{ fill: var(--fd-field-fill, {t['field-fill']}); fill-opacity: 0.55; stroke: var(--fd-field-border, {t['field-border']}); stroke-width: 1; stroke-dasharray: 5 3; }}
-  .fd-slack-box   {{ fill: var(--fd-muted, {t['muted']}); fill-opacity: 0.10; stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; stroke-dasharray: 2 3; }}
-  .fd-slack-label {{ fill: var(--fd-muted, {t['muted']}); }}
-  .fd-allocation-plus    {{ fill: var(--fd-muted, {t['muted']}); }}
-  .fd-field-label   {{ fill: var(--fd-field-text, {t['field-text']}); }}
-  .fd-padding-label  {{ fill: var(--fd-muted, {t['muted']}); }}
-  .fd-callout-label {{ fill: var(--fd-text, {t['text']}); }}
-  .fd-leader-line  {{ stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; fill: none; }}
-  .fd-ruler-line   {{ stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; }}
-  .fd-cache-line   {{ stroke: var(--fd-text, {t['text']}); stroke-width: 3; stroke-dasharray: 7 4; opacity: 0.8; }}
-  .fd-cache-line-label    {{ fill: var(--fd-text, {t['text']}); }}
-  .fd-pointer-arrow  {{ stroke: var(--fd-text, {t['text']}); stroke-width: 1.5; fill: none; }}
-  .fd-pointer-head   {{ fill: var(--fd-text, {t['text']}); }}
-  .fd-ruler-label    {{ fill: var(--fd-muted, {t['muted']}); }}
-  .fd-note  {{ fill: var(--fd-highlight, {t['highlight']}); }}
-  .fd-note-plain {{ fill: var(--fd-text, {t['text']}); }}
-  text        {{ font-family: var(--fd-font, {t['font']}); }}
-  .fd-hatch-background {{ fill: var(--fd-padding-fill, {t['padding-fill']}); }}
-  .fd-hatch-lines {{ stroke: var(--fd-padding-stroke, {t['padding-stroke']}); stroke-width: 1.5; }}
-  .fd-subdivision-line  {{ stroke: var(--fd-field-text, {t['field-text']}); stroke-width: 1; stroke-dasharray: 2 3; opacity: 0.45; }}{tail}
+  .fd-background      {{ fill: {t['background']}; fill: var(--fd-background, {t['background']}); }}
+  .fd-title   {{ fill: {t['text']}; fill: var(--fd-text, {t['text']}); }}
+  .fd-field-box   {{ fill: {t['field-fill']}; fill: var(--fd-field-fill, {t['field-fill']}); stroke: {t['field-border']}; stroke: var(--fd-field-border, {t['field-border']}); stroke-width: 1; }}
+  .fd-padding-box     {{ fill: url(#fd-hatch); stroke: {t['padding-stroke']}; stroke: var(--fd-padding-stroke, {t['padding-stroke']}); stroke-width: 1; }}
+  .fd-flexible-array    {{ fill: none; stroke: {t['muted']}; stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; stroke-dasharray: 4 3; }}
+  .fd-extra-box   {{ fill: {t['field-fill']}; fill: var(--fd-field-fill, {t['field-fill']}); fill-opacity: 0.55; stroke: {t['field-border']}; stroke: var(--fd-field-border, {t['field-border']}); stroke-width: 1; stroke-dasharray: 5 3; }}
+  .fd-slack-box   {{ fill: {t['muted']}; fill: var(--fd-muted, {t['muted']}); fill-opacity: 0.10; stroke: {t['muted']}; stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; stroke-dasharray: 2 3; }}
+  .fd-slack-label {{ fill: {t['muted']}; fill: var(--fd-muted, {t['muted']}); }}
+  .fd-allocation-plus    {{ fill: {t['muted']}; fill: var(--fd-muted, {t['muted']}); }}
+  .fd-field-label   {{ fill: {t['field-text']}; fill: var(--fd-field-text, {t['field-text']}); }}
+  .fd-padding-label  {{ fill: {t['muted']}; fill: var(--fd-muted, {t['muted']}); }}
+  .fd-callout-label {{ fill: {t['text']}; fill: var(--fd-text, {t['text']}); }}
+  .fd-leader-line  {{ stroke: {t['muted']}; stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; fill: none; }}
+  .fd-ruler-line   {{ stroke: {t['muted']}; stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; }}
+  .fd-cache-line   {{ stroke: {t['text']}; stroke: var(--fd-text, {t['text']}); stroke-width: 3; stroke-dasharray: 7 4; opacity: 0.8; }}
+  .fd-cache-line-label    {{ fill: {t['text']}; fill: var(--fd-text, {t['text']}); }}
+  .fd-pointer-arrow  {{ stroke: {t['text']}; stroke: var(--fd-text, {t['text']}); stroke-width: 1.5; fill: none; }}
+  .fd-pointer-head   {{ fill: {t['text']}; fill: var(--fd-text, {t['text']}); }}
+  .fd-ruler-label    {{ fill: {t['muted']}; fill: var(--fd-muted, {t['muted']}); }}
+  .fd-note  {{ fill: {t['highlight']}; fill: var(--fd-highlight, {t['highlight']}); }}
+  .fd-note-plain {{ fill: {t['text']}; fill: var(--fd-text, {t['text']}); }}
+  text        {{ font-family: {t['font']}; font-family: var(--fd-font, {t['font']}); }}
+  .fd-hatch-background {{ fill: {t['padding-fill']}; fill: var(--fd-padding-fill, {t['padding-fill']}); }}
+  .fd-hatch-lines {{ stroke: {t['padding-stroke']}; stroke: var(--fd-padding-stroke, {t['padding-stroke']}); stroke-width: 1.5; }}
+  .fd-subdivision-line  {{ stroke: {t['field-text']}; stroke: var(--fd-field-text, {t['field-text']}); stroke-width: 1; stroke-dasharray: 2 3; opacity: 0.45; }}{tail}
 </style>"""
 
 
@@ -522,9 +564,10 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
         dims = f'style="width:100%;max-width:{width}px;height:auto"'
     else:
         dims = f'width="{width}" height="{height}"'
-    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" '
+    body = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" '
             f'{dims}>\n{_style_block(opts.theme, opts.extra_css)}\n'
             f'{bg}{HATCH}\n' + "\n".join(parts) + "\n</svg>")
+    return _inline_presentation(body, opts.theme)
 
 
 def render_to_file(sl: StructLayout, path: str | Path,
