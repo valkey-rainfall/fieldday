@@ -194,6 +194,23 @@ check("relabel_and_hide", () => {
   assert(!svg.includes(">b<") && !svg.includes(">f:4<"), "hidden/original labels leaked");
 });
 
+check("bitfield_unit_padding_tiled", () => {
+  // sub-byte gap after the last bitfield in a unit must be hatched, not blank
+  const svg = renderStruct(computeLayouts(
+    "struct s { uint64_t a; unsigned f : 12; unsigned p : 1; void *q; };")[0],
+    { pxPerByte: 16, margin: 20 });
+  const boxes = [];
+  const re = /<rect class="(?:fd-field|fd-pad)" x="(-?[\d.]+)" y="(-?[\d.]+)" width="(-?[\d.]+)"/g;
+  for (const m of svg.matchAll(re)) boxes.push([parseFloat(m[1]), parseFloat(m[3])]);
+  boxes.sort((a, b) => a[0] - b[0]);
+  let cursor = boxes[0][0];
+  for (const [x, w] of boxes) {
+    assert(Math.abs(x - cursor) < 0.11, `blank gap at x=${x} (cursor ${cursor})`);
+    cursor = x + w;
+  }
+  assert(Math.abs(cursor - boxes[0][0] - 24 * 16) < 0.11, "bar does not span struct");
+});
+
 console.log(`geometry: ${pass} passed, ${fail} failed`);
 if (failures.length) {
   for (const f of failures) console.error("FAIL " + f);

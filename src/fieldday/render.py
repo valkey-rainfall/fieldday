@@ -104,6 +104,24 @@ def segments_from_layout(sl: StructLayout, opts: RenderOptions) -> list[Segment]
                                 f.offset * 8, f.size * 8,
                                 is_padding=f.is_padding,
                                 dividers_bits=tuple(d * 8 for d in (f.dividers or ()))))
+    # fill sub-byte gaps (bitfield allocation-unit padding) with hatched
+    # padding at bit precision -- the layout model's pad fields are byte-
+    # granular, so leftover bits after the last bitfield in a unit would
+    # otherwise render as blank canvas
+    segs.sort(key=lambda g: g.start_bits)
+    filled: list[Segment] = []
+    cursor_bits = 0
+    for g in segs:
+        if g.start_bits > cursor_bits:
+            filled.append(Segment("", cursor_bits, g.start_bits - cursor_bits,
+                                  is_padding=True))
+        filled.append(g)
+        cursor_bits = max(cursor_bits, g.start_bits + g.width_bits)
+    if sl.size * 8 > cursor_bits:
+        filled.append(Segment("", cursor_bits, sl.size * 8 - cursor_bits,
+                              is_padding=True))
+    segs = filled
+
     # hand-annotated companion allocations (from layout JSON)
     cursor = max([sl.size * 8] + [g.start_bits + g.width_bits for g in segs])
     for extra in sl.extras:

@@ -65,7 +65,7 @@ function paddingBytes(sl) {
 
 function segmentsFromLayout(sl, opts) {
   const relabel = sl.relabel || {};
-  const segs = [];
+  let segs = [];
   for (const f of sl.fields) {
     // manual relabel: custom label used verbatim; '' hides the label
     const custom = f.is_padding ? undefined : relabel[f.name];
@@ -89,6 +89,27 @@ function segmentsFromLayout(sl, opts) {
                   dividersBits: (f.dividers || []).map((d) => d * 8) });
     }
   }
+  // fill sub-byte gaps (bitfield allocation-unit padding) with hatched
+  // padding at bit precision -- the layout model's pad fields are byte-
+  // granular, so leftover bits after the last bitfield in a unit would
+  // otherwise render as blank canvas
+  segs.sort((a, b) => a.startBits - b.startBits);
+  const filled = [];
+  let cursorBits = 0;
+  for (const g of segs) {
+    if (g.startBits > cursorBits) {
+      filled.push({ label: "", startBits: cursorBits,
+                    widthBits: g.startBits - cursorBits, isPadding: true });
+    }
+    filled.push(g);
+    cursorBits = Math.max(cursorBits, g.startBits + g.widthBits);
+  }
+  if (sl.size * 8 > cursorBits) {
+    filled.push({ label: "", startBits: cursorBits,
+                  widthBits: sl.size * 8 - cursorBits, isPadding: true });
+  }
+  segs = filled;
+
   // hand-annotated companion allocations
   let cursor = Math.max(sl.size * 8, ...segs.map((g) => g.startBits + g.widthBits));
   for (const extra of sl.extras || []) {
