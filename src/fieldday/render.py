@@ -232,8 +232,8 @@ def _style_block(theme: dict, extra_css: str = "") -> str:
   .fd-callout {{ fill: var(--fd-text, {t['text']}); }}
   .fd-leader  {{ stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; fill: none; }}
   .fd-ruler   {{ stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; }}
-  .fd-cline   {{ stroke: var(--fd-accent, {t['accent']}); stroke-width: 2.5; }}
-  .fd-clbl    {{ fill: var(--fd-accent, {t['accent']}); }}
+  .fd-cline   {{ stroke: var(--fd-text, {t['text']}); stroke-width: 3; stroke-dasharray: 7 4; opacity: 0.8; }}
+  .fd-clbl    {{ fill: var(--fd-text, {t['text']}); }}
   .fd-rlbl    {{ fill: var(--fd-muted, {t['muted']}); }}
   .fd-accent  {{ fill: var(--fd-accent, {t['accent']}); }}
   text        {{ font-family: var(--fd-font, {t['font']}); }}
@@ -281,6 +281,20 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
     bar_top = cy
     assign_elbows(runs, bar_top)
 
+    # group segments into allocations: the struct plus its embedded
+    # extras form allocation 0; each separate extra starts a new
+    # allocation that includes any embedded extras following it
+    allocs = []
+    _cur_start, _cur_end = 0, sl.size * 8
+    for g in segs:
+        if g.is_extra and g.extra_kind == "separate":
+            allocs.append((_cur_start, _cur_end))
+            _cur_start = g.start_bits
+            _cur_end = g.start_bits + g.width_bits
+        else:
+            _cur_end = max(_cur_end, g.start_bits + g.width_bits)
+    allocs.append((_cur_start, _cur_end))
+
     # bar segments
     for seg in segs:
         x = x0 + seg.start_bits / 8 * ppb
@@ -303,6 +317,19 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
             dx = x + db / 8 * ppb
             parts.append(f'<line class="fd-subdiv" x1="{dx:.1f}" y1="{bar_top + 3:.1f}" '
                          f'x2="{dx:.1f}" y2="{bar_top + opts.bar_height - 3:.1f}"/>')
+    # cache-line boundaries: bold dashed rules cutting through the bar
+    # (and down to the ruler when present), per allocation
+    if opts.cache_line:
+        rule_bottom = bar_top + opts.bar_height + (8 + 9 if opts.ruler else 0)
+        for a_start, a_end in allocs:
+            n_bytes = (a_end - a_start) // 8
+            b = opts.cache_line
+            while b <= n_bytes:
+                x = x0 + a_start / 8 * ppb + b * ppb
+                parts.append(f'<line class="fd-cline" x1="{x:.1f}" y1="{bar_top - 4:.1f}" '
+                             f'x2="{x:.1f}" y2="{rule_bottom:.1f}"/>')
+                b += opts.cache_line
+
     for seg, txt in inline:
         if not txt:
             continue
@@ -351,26 +378,16 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
                 b += opts.ruler_step
             if n_bytes % opts.ruler_step != 0 and not (cl and n_bytes % cl == 0):
                 tick(n_bytes, "fd-ruler", 6, "fd-rlbl", "600")
-            # cache-line boundaries: emphasized ticks drawn last (on top)
+            # cache-line boundaries: bold label; the rule itself is the
+            # full-height overlay drawn through the bar
             if cl:
                 b = cl
                 while b <= n_bytes:
-                    tick(b, "fd-cline", 9, "fd-clbl", "700")
+                    x = rx1 + b * ppb
+                    parts.append(_text(x, ry + 20, str(label_base + b), 12,
+                                       "fd-clbl", weight="700"))
                     b += cl
 
-        # group segments into allocations: the struct plus its embedded
-        # extras form allocation 0; each separate extra starts a new
-        # allocation that includes any embedded extras following it
-        allocs = []
-        cur_start, cur_end = 0, sl.size * 8
-        for g in segs:
-            if g.is_extra and g.extra_kind == "separate":
-                allocs.append((cur_start, cur_end))
-                cur_start = g.start_bits
-                cur_end = g.start_bits + g.width_bits
-            else:
-                cur_end = max(cur_end, g.start_bits + g.width_bits)
-        allocs.append((cur_start, cur_end))
         for a_start, a_end in allocs:
             draw_ruler(a_start, a_end, 0)
         cy = ry + 26

@@ -221,8 +221,8 @@ function styleBlock(theme, extraCss = "") {
   .fd-callout { fill: var(--fd-text, ${t["text"]}); }
   .fd-leader  { stroke: var(--fd-muted, ${t["muted"]}); stroke-width: 1; fill: none; }
   .fd-ruler   { stroke: var(--fd-muted, ${t["muted"]}); stroke-width: 1; }
-  .fd-cline   { stroke: var(--fd-accent, ${t["accent"]}); stroke-width: 2.5; }
-  .fd-clbl    { fill: var(--fd-accent, ${t["accent"]}); }
+  .fd-cline   { stroke: var(--fd-text, ${t["text"]}); stroke-width: 3; stroke-dasharray: 7 4; opacity: 0.8; }
+  .fd-clbl    { fill: var(--fd-text, ${t["text"]}); }
   .fd-rlbl    { fill: var(--fd-muted, ${t["muted"]}); }
   .fd-accent  { fill: var(--fd-accent, ${t["accent"]}); }
   text        { font-family: var(--fd-font, ${t["font"]}); }
@@ -274,6 +274,24 @@ export function renderStruct(sl, userOpts = {}) {
   const barTop = cy;
   assignElbows(runs, barTop);
 
+  // group segments into allocations: the struct plus its embedded
+  // extras form allocation 0; each separate extra starts a new
+  // allocation that includes any embedded extras following it
+  const allocs = [];
+  {
+    let curStart = 0, curEnd = sl.size * 8;
+    for (const g of segs) {
+      if (g.isExtra && g.extraKind === "separate") {
+        allocs.push([curStart, curEnd]);
+        curStart = g.startBits;
+        curEnd = g.startBits + g.widthBits;
+      } else {
+        curEnd = Math.max(curEnd, g.startBits + g.widthBits);
+      }
+    }
+    allocs.push([curStart, curEnd]);
+  }
+
   // bar segments
   for (const seg of segs) {
     const x = x0 + seg.startBits / 8 * ppb;
@@ -297,6 +315,20 @@ export function renderStruct(sl, userOpts = {}) {
         `x2="${f1(dx)}" y2="${f1(barTop + opts.barHeight - 3)}"/>`);
     }
   }
+  // cache-line boundaries: bold dashed rules cutting through the bar
+  // (and down to the ruler when present), per allocation
+  if (opts.cacheLine) {
+    const ruleBottom = barTop + opts.barHeight + (opts.ruler ? 8 + 9 : 0);
+    for (const [aStart, aEnd] of allocs) {
+      const nBytes = Math.trunc((aEnd - aStart) / 8);
+      for (let b = opts.cacheLine; b <= nBytes; b += opts.cacheLine) {
+        const x = x0 + aStart / 8 * ppb + b * ppb;
+        parts.push(`<line class="fd-cline" x1="${f1(x)}" y1="${f1(barTop - 4)}" ` +
+          `x2="${f1(x)}" y2="${f1(ruleBottom)}"/>`);
+      }
+    }
+  }
+
   for (const [seg, txt] of inline) {
     if (!txt) continue;
     const x = x0 + (seg.startBits + seg.widthBits / 2) / 8 * ppb;
@@ -342,26 +374,15 @@ export function renderStruct(sl, userOpts = {}) {
       if (nBytes % opts.rulerStep !== 0 && !(cl && nBytes % cl === 0)) {
         tick(nBytes, "fd-ruler", 6, "fd-rlbl", "600");
       }
-      // cache-line boundaries: emphasized ticks drawn last (on top)
+      // cache-line boundaries: bold label; the rule itself is the
+      // full-height overlay drawn through the bar
       if (cl) {
-        for (let b = cl; b <= nBytes; b += cl) tick(b, "fd-cline", 9, "fd-clbl", "700");
+        for (let b = cl; b <= nBytes; b += cl) {
+          const x = rx1 + b * ppb;
+          parts.push(textEl(x, ry + 20, String(labelBase + b), 12, "fd-clbl", "middle", "700"));
+        }
       }
     };
-    // group segments into allocations: the struct plus its embedded
-    // extras form allocation 0; each separate extra starts a new
-    // allocation that includes any embedded extras following it
-    const allocs = [];
-    let curStart = 0, curEnd = sl.size * 8;
-    for (const g of segs) {
-      if (g.isExtra && g.extraKind === "separate") {
-        allocs.push([curStart, curEnd]);
-        curStart = g.startBits;
-        curEnd = g.startBits + g.widthBits;
-      } else {
-        curEnd = Math.max(curEnd, g.startBits + g.widthBits);
-      }
-    }
-    allocs.push([curStart, curEnd]);
     for (const [aStart, aEnd] of allocs) drawRuler(aStart, aEnd, 0);
     cy = ry + 26;
   }
