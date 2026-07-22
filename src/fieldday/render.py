@@ -51,6 +51,7 @@ class RenderOptions:
     theme: dict = field(default_factory=dict)
     transparent: bool = False     # skip background rect
     responsive: bool = False      # fluid width (100% up to natural size)
+    extra_css: str = ""           # user CSS appended inside the <style> block
     corner_radius: int = 4
     margin: int = 24
 
@@ -68,6 +69,7 @@ class Segment:
     is_flex: bool = False
     is_extra: bool = False       # hand-annotated companion allocation
     extra_kind: str = "embedded"  # embedded (same alloc) | separate (own alloc)
+    dividers_bits: tuple = ()     # light internal boundaries, relative bits
 
     @property
     def bytes_str(self) -> str:
@@ -92,7 +94,8 @@ def segments_from_layout(sl: StructLayout, opts: RenderOptions) -> list[Segment]
             name = ("*" + f.name) if f.is_pointer and not f.name.startswith("*") else f.name
             segs.append(Segment("pad" if f.is_padding else name,
                                 f.offset * 8, f.size * 8,
-                                is_padding=f.is_padding))
+                                is_padding=f.is_padding,
+                                dividers_bits=tuple(d * 8 for d in (f.dividers or ()))))
     # hand-annotated companion allocations (from layout JSON)
     cursor = max([sl.size * 8] + [g.start_bits + g.width_bits for g in segs])
     for extra in sl.extras:
@@ -186,8 +189,9 @@ def _esc(s: str) -> str:
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def _style_block(theme: dict) -> str:
+def _style_block(theme: dict, extra_css: str = "") -> str:
     t = {**DEFAULT_THEME, **theme}
+    tail = ("\n" + extra_css.strip()) if extra_css.strip() else ""
     return f"""<style>
   .fd-bg      {{ fill: var(--fd-bg, {t['bg']}); }}
   .fd-title   {{ fill: var(--fd-text, {t['text']}); }}
@@ -206,6 +210,7 @@ def _style_block(theme: dict) -> str:
   text        {{ font-family: var(--fd-font, {t['font']}); }}
   .fd-hatchbg {{ fill: var(--fd-pad, {t['pad']}); }}
   .fd-hatchln {{ stroke: var(--fd-pad-stroke, {t['pad-stroke']}); stroke-width: 1.5; }}
+  .fd-subdiv  {{ stroke: var(--fd-field-text, {t['field-text']}); stroke-width: 1; stroke-dasharray: 2 3; opacity: 0.45; }}{tail}
 </style>"""
 
 
@@ -265,6 +270,10 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
             cls = "fd-field"
         parts.append(f'<rect class="{cls}" x="{x:.1f}" y="{bar_top:.1f}" '
                      f'width="{w:.1f}" height="{opts.bar_height}" rx="{opts.corner_radius}"/>')
+        for db in seg.dividers_bits:
+            dx = x + db / 8 * ppb
+            parts.append(f'<line class="fd-subdiv" x1="{dx:.1f}" y1="{bar_top + 3:.1f}" '
+                         f'x2="{dx:.1f}" y2="{bar_top + opts.bar_height - 3:.1f}"/>')
     for seg, txt in inline:
         if not txt:
             continue
@@ -287,20 +296,35 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
 
     cy = bar_top + opts.bar_height
 
-    # byte ruler
+    # byte rulers: the main allocation ruler continues across embedded
+    # extras (same allocation); each separate extra gets its own ruler
+    # restarting at 0 (it is its own allocation).
     if opts.ruler:
         ry = cy + 8
-        parts.append(f'<line class="fd-ruler" x1="{x0}" y1="{ry}" x2="{x0 + total_px:.1f}" y2="{ry}"/>')
-        b = 0
-        while b <= sl.size:
-            x = x0 + b * ppb
-            parts.append(f'<line class="fd-ruler" x1="{x:.1f}" y1="{ry}" x2="{x:.1f}" y2="{ry + 6}"/>')
-            parts.append(_text(x, ry + 20, str(b), 11, "fd-rlbl"))
-            b += opts.ruler_step
-        if (sl.size % opts.ruler_step) != 0:
-            x = x0 + sl.size * ppb
-            parts.append(f'<line class="fd-ruler" x1="{x:.1f}" y1="{ry}" x2="{x:.1f}" y2="{ry + 6}"/>')
-            parts.append(_text(x, ry + 20, str(sl.size), 11, "fd-rlbl"))
+
+        def draw_ruler(start_bits, end_bits, label_base):
+            rx1 = x0 + start_bits / 8 * ppb
+            rx2 = x0 + end_bits / 8 * ppb
+            n_bytes = (end_bits - start_bits) // 8
+            parts.append(f'<line class="fd-ruler" x1="{rx1:.1f}" y1="{ry}" x2="{rx2:.1f}" y2="{ry}"/>')
+            b = 0
+            while b <= n_bytes:
+                x = rx1 + b * ppb
+                parts.append(f'<line class="fd-ruler" x1="{x:.1f}" y1="{ry}" x2="{x:.1f}" y2="{ry + 6}"/>')
+                parts.append(_text(x, ry + 20, str(label_base + b), 11, "fd-rlbl"))
+                b += opts.ruler_step
+            if n_bytes % opts.ruler_step != 0:
+                x = rx1 + n_bytes * ppb
+                parts.append(f'<line class="fd-ruler" x1="{x:.1f}" y1="{ry}" x2="{x:.1f}" y2="{ry + 6}"/>')
+                parts.append(_text(x, ry + 20, str(label_base + n_bytes), 11, "fd-rlbl"))
+
+        main_end = max([sl.size * 8] +
+                       [g.start_bits + g.width_bits for g in segs
+                        if not (g.is_extra and g.extra_kind == "separate")])
+        draw_ruler(0, main_end, 0)
+        for g in segs:
+            if g.is_extra and g.extra_kind == "separate":
+                draw_ruler(g.start_bits, g.start_bits + g.width_bits, 0)
         cy = ry + 26
 
     # padding callout
@@ -330,7 +354,7 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
     else:
         dims = f'width="{width}" height="{height}"'
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" '
-            f'{dims}>\n{_style_block(opts.theme)}\n'
+            f'{dims}>\n{_style_block(opts.theme, opts.extra_css)}\n'
             f'{bg}{HATCH}\n' + "\n".join(parts) + "\n</svg>")
 
 

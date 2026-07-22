@@ -199,9 +199,29 @@ class TestAnnotations:
         svg = render_struct(sl, RenderOptions(responsive=True))
         assert "width:100%;max-width:" in svg and 'height="' not in svg.split(">")[0].replace("viewBox", "")
 
-    def test_ruler_spans_struct_only(self):
-        # extras must not extend the byte ruler
-        sl = self._layout(extras=[{"label": "e", "bytes": 100, "kind": "embedded"}])
+    def test_ruler_continues_over_embedded(self):
+        # embedded extras are the same allocation: main ruler spans them
+        sl = self._layout(extras=[{"label": "e", "bytes": 16, "kind": "embedded"}])
         svg = render_struct(sl, RenderOptions())
         rlbls = re.findall(r'class="fd-rlbl"[^>]*>(\d+)<', svg)
-        assert max(int(x) for x in rlbls) == 8
+        assert max(int(x) for x in rlbls) == 24  # 8B struct + 16B embedded
+
+    def test_separate_extra_gets_own_ruler(self):
+        # separate allocations restart their ruler at 0
+        sl = self._layout(extras=[{"label": "s", "bytes": 16, "kind": "separate"}])
+        svg = render_struct(sl, RenderOptions())
+        rlbls = [int(x) for x in re.findall(r'class="fd-rlbl"[^>]*>(\d+)<', svg)]
+        assert max(rlbls) == 16          # separate ruler: 0..16
+        assert rlbls.count(0) == 2       # two rulers, both starting at 0
+
+    def test_extra_css_appended(self):
+        sl = self._layout()
+        svg = render_struct(sl, RenderOptions(extra_css=".fd-field { fill: pink; }"))
+        assert ".fd-field { fill: pink; }" in svg
+
+    def test_array_dividers_drawn(self):
+        from fieldday.cparse import parse_snippet
+        from fieldday.probe import compute_layouts
+        sl = compute_layouts(parse_snippet("struct s { int x[5]; int tail; };"))[0]
+        svg = render_struct(sl, RenderOptions())
+        assert svg.count('class="fd-subdiv"') == 4  # 5 elements -> 4 dividers

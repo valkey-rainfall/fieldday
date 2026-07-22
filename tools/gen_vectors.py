@@ -30,6 +30,14 @@ CORPUS = {
     "pointer_fields": "struct p { void *ptr; int x; };",
     "char_array": "struct p { char buf[13]; long l; };",
     "multidim_sizes": "struct p { int a[4]; short b[3]; };",
+    "nested_bitfield_dividers": """
+        struct bfinner { unsigned a : 4; unsigned b : 12; int c; };
+        struct bfouter { char pre; struct bfinner in; };
+    """,
+    "nested_with_dividers": """
+        struct inner2 { long a; int b; short c; };
+        struct outer2 { int x[5]; struct inner2 in; char tail; };
+    """,
     "builtin_stub_alignment": "struct p { char c; sds s; };",
     "user_stub": "//@ stub mytype 12 4\nstruct p { char c; mytype m; };",
     "bitfield_packing": "struct p { unsigned a : 12; unsigned b : 1; unsigned c : 19; };",
@@ -99,6 +107,8 @@ def field_dict(f):
         d["bit_width"] = f.bit_width
     if f.struct_ref:
         d["struct_ref"] = f.struct_ref
+    if f.dividers:
+        d["dividers"] = f.dividers
     return d
 
 

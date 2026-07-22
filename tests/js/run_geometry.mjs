@@ -159,12 +159,30 @@ check("extras_and_note", () => {
   assert(svg.includes("51 bytes total"), "note missing");
   assert(svg.includes("Hand title"), "title missing");
 });
-check("ruler_spans_struct_only", () => {
+check("ruler_continues_over_embedded", () => {
   const sl = computeLayouts("struct s { long a; };")[0];
-  sl.extras = [{ label: "e", bytes: 100, kind: "embedded" }];
+  sl.extras = [{ label: "e", bytes: 16, kind: "embedded" }];
   const svg = renderStruct(sl);
   const labels = [...svg.matchAll(/class="fd-rlbl"[^>]*>(\d+)</g)].map((m) => parseInt(m[1], 10));
-  assert(Math.max(...labels) === 8, `ruler extends past struct: ${Math.max(...labels)}`);
+  assert(Math.max(...labels) === 24, `expected 24, got ${Math.max(...labels)}`);
+});
+check("separate_extra_own_ruler", () => {
+  const sl = computeLayouts("struct s { long a; };")[0];
+  sl.extras = [{ label: "s", bytes: 16, kind: "separate" }];
+  const svg = renderStruct(sl);
+  const labels = [...svg.matchAll(/class="fd-rlbl"[^>]*>(\d+)</g)].map((m) => parseInt(m[1], 10));
+  assert(Math.max(...labels) === 16, `expected 16, got ${Math.max(...labels)}`);
+  assert(labels.filter((x) => x === 0).length === 2, "expected two 0-origin rulers");
+});
+check("array_dividers_drawn", () => {
+  const svg = renderStruct(computeLayouts("struct s { int x[5]; int tail; };")[0]);
+  const n = (svg.match(/class="fd-subdiv"/g) || []).length;
+  assert(n === 4, `expected 4 subdividers, got ${n}`);
+});
+check("extra_css_appended", () => {
+  const svg = renderStruct(computeLayouts("struct s { long a; };")[0],
+                           { extraCss: ".fd-field { fill: pink; }" });
+  assert(svg.includes(".fd-field { fill: pink; }"), "custom css missing");
 });
 
 console.log(`geometry: ${pass} passed, ${fail} failed`);

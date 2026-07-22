@@ -100,6 +100,7 @@ function options() {
     paddingCallout: $("padcallout").checked,
     transparent: $("transparent").checked,
     responsive: $("responsive").checked,
+    extraCss: $("customcss").value,
   };
 }
 
@@ -174,6 +175,7 @@ function scheduleRender() {
 
 $("snippet").addEventListener("input", scheduleRender);
 $("extras").addEventListener("input", scheduleRender);
+$("customcss").addEventListener("input", scheduleRender);
 for (const id of ["theme", "ppb", "ruler", "padcallout", "transparent",
                   "responsive", "title", "note", "structpick"]) {
   $(id).addEventListener("change", rerender);

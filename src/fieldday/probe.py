@@ -37,6 +37,8 @@ class FieldLayout:
     bit_offset: int | None = None  # absolute bit offset within struct
     bit_width: int | None = None
     struct_ref: str | None = None
+    dividers: list | None = None  # internal boundaries (byte offsets within
+                                  # the field): array elements / nested fields
 
 
 @dataclass
@@ -183,10 +185,21 @@ def compute_layouts(snippet: Snippet) -> list[StructLayout]:
                                    align=int(parts[3]))
         elif parts[0] == "FIELD" and current:
             decl = decl_by_struct[current.name][parts[1]]
+            size = int(parts[3])
+            dividers = None
+            if decl.array_len and decl.array_len > 1 and size % decl.array_len == 0:
+                elem = size // decl.array_len
+                dividers = [k * elem for k in range(1, decl.array_len)]
+            elif decl.struct_ref and not decl.is_pointer:
+                ref = next((l for l in layouts if l.name == decl.struct_ref), None)
+                if ref is not None:
+                    dividers = sorted({f.offset for f in ref.fields
+                                       if f.offset > 0}) or None
             current.fields.append(FieldLayout(
                 name=parts[1], type_str=decl.type_str,
-                offset=int(parts[2]), size=int(parts[3]),
-                is_pointer=decl.is_pointer, struct_ref=decl.struct_ref))
+                offset=int(parts[2]), size=size,
+                is_pointer=decl.is_pointer, struct_ref=decl.struct_ref,
+                dividers=dividers))
         elif parts[0] == "BITFIELD" and current:
             decl = decl_by_struct[current.name][parts[1]]
             bit_off, bit_w = int(parts[2]), int(parts[3])

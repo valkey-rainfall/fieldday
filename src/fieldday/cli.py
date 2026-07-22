@@ -69,7 +69,7 @@ def layouts_from_json(text: str) -> list[StructLayout]:
                 is_pointer=f.get("is_pointer", False),
                 is_padding=f.get("is_padding", False),
                 bit_offset=f.get("bit_offset"), bit_width=f.get("bit_width"),
-                struct_ref=f.get("struct_ref")))
+                struct_ref=f.get("struct_ref"), dividers=f.get("dividers")))
         out.append(sl)
     return out
 
@@ -93,6 +93,8 @@ def main(argv=None) -> int:
     ap.add_argument("--theme", default="valkey", metavar="NAME|FILE",
                     help="builtin theme (valkey/light default, dark) or JSON theme file")
     ap.add_argument("--title", help="diagram title (default: struct NAME)")
+    ap.add_argument("--css", metavar="FILE",
+                    help="extra CSS appended inside the SVG <style> block")
     ap.add_argument("--transparent", action="store_true",
                     help="no background rect (inherit page background)")
     ap.add_argument("--responsive", action="store_true",
@@ -134,6 +136,7 @@ def main(argv=None) -> int:
         title=args.title,
         transparent=args.transparent,
         responsive=args.responsive,
+        extra_css=Path(args.css).read_text() if args.css else "",
         ruler=not args.no_ruler,
         padding_callout=not args.no_padding_callout,
         px_per_byte=args.px_per_byte,

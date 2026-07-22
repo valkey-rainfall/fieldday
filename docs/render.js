@@ -51,6 +51,7 @@ export function defaultOptions() {
     theme: {},
     transparent: false,    // skip background rect
     responsive: false,     // fluid width (100% up to natural size)
+    extraCss: "",          // user CSS appended inside the <style> block
     cornerRadius: 4,
     margin: 24,
   };
@@ -78,7 +79,8 @@ function segmentsFromLayout(sl, opts) {
       const name = (f.is_pointer && !f.name.startsWith("*")) ? "*" + f.name : f.name;
       segs.push({ label: f.is_padding ? "pad" : name,
                   startBits: f.offset * 8, widthBits: f.size * 8,
-                  isPadding: !!f.is_padding });
+                  isPadding: !!f.is_padding,
+                  dividersBits: (f.dividers || []).map((d) => d * 8) });
     }
   }
   // hand-annotated companion allocations
@@ -175,8 +177,9 @@ function f1(x) {
   return (Object.is(out, -0) ? 0 : out).toFixed(1);
 }
 
-function styleBlock(theme) {
+function styleBlock(theme, extraCss = "") {
   const t = { ...DEFAULT_THEME, ...theme };
+  const tail = extraCss.trim() ? "\n" + extraCss.trim() : "";
   return `<style>
   .fd-bg      { fill: var(--fd-bg, ${t["bg"]}); }
   .fd-title   { fill: var(--fd-text, ${t["text"]}); }
@@ -195,6 +198,7 @@ function styleBlock(theme) {
   text        { font-family: var(--fd-font, ${t["font"]}); }
   .fd-hatchbg { fill: var(--fd-pad, ${t["pad"]}); }
   .fd-hatchln { stroke: var(--fd-pad-stroke, ${t["pad-stroke"]}); stroke-width: 1.5; }
+  .fd-subdiv  { stroke: var(--fd-field-text, ${t["field-text"]}); stroke-width: 1; stroke-dasharray: 2 3; opacity: 0.45; }${tail}
 </style>`;
 }
 
@@ -257,6 +261,11 @@ export function renderStruct(sl, userOpts = {}) {
     } else cls = "fd-field";
     parts.push(`<rect class="${cls}" x="${f1(x)}" y="${f1(barTop)}" ` +
       `width="${f1(w)}" height="${opts.barHeight}" rx="${opts.cornerRadius}"/>`);
+    for (const db of seg.dividersBits || []) {
+      const dx = x + db / 8 * ppb;
+      parts.push(`<line class="fd-subdiv" x1="${f1(dx)}" y1="${f1(barTop + 3)}" ` +
+        `x2="${f1(dx)}" y2="${f1(barTop + opts.barHeight - 3)}"/>`);
+    }
   }
   for (const [seg, txt] of inline) {
     if (!txt) continue;
@@ -281,19 +290,35 @@ export function renderStruct(sl, userOpts = {}) {
 
   cy = barTop + opts.barHeight;
 
-  // byte ruler
+  // byte rulers: the main allocation ruler continues across embedded
+  // extras (same allocation); each separate extra gets its own ruler
+  // restarting at 0 (it is its own allocation).
   if (opts.ruler) {
     const ry = cy + 8;
-    parts.push(`<line class="fd-ruler" x1="${x0}" y1="${ry}" x2="${f1(x0 + totalPx)}" y2="${ry}"/>`);
-    for (let b = 0; b <= sl.size; b += opts.rulerStep) {
-      const x = x0 + b * ppb;
-      parts.push(`<line class="fd-ruler" x1="${f1(x)}" y1="${ry}" x2="${f1(x)}" y2="${ry + 6}"/>`);
-      parts.push(textEl(x, ry + 20, String(b), 11, "fd-rlbl"));
-    }
-    if (sl.size % opts.rulerStep !== 0) {
-      const x = x0 + sl.size * ppb;
-      parts.push(`<line class="fd-ruler" x1="${f1(x)}" y1="${ry}" x2="${f1(x)}" y2="${ry + 6}"/>`);
-      parts.push(textEl(x, ry + 20, String(sl.size), 11, "fd-rlbl"));
+    const drawRuler = (startBits, endBits, labelBase) => {
+      const rx1 = x0 + startBits / 8 * ppb;
+      const rx2 = x0 + endBits / 8 * ppb;
+      const nBytes = Math.trunc((endBits - startBits) / 8);
+      parts.push(`<line class="fd-ruler" x1="${f1(rx1)}" y1="${ry}" x2="${f1(rx2)}" y2="${ry}"/>`);
+      for (let b = 0; b <= nBytes; b += opts.rulerStep) {
+        const x = rx1 + b * ppb;
+        parts.push(`<line class="fd-ruler" x1="${f1(x)}" y1="${ry}" x2="${f1(x)}" y2="${ry + 6}"/>`);
+        parts.push(textEl(x, ry + 20, String(labelBase + b), 11, "fd-rlbl"));
+      }
+      if (nBytes % opts.rulerStep !== 0) {
+        const x = rx1 + nBytes * ppb;
+        parts.push(`<line class="fd-ruler" x1="${f1(x)}" y1="${ry}" x2="${f1(x)}" y2="${ry + 6}"/>`);
+        parts.push(textEl(x, ry + 20, String(labelBase + nBytes), 11, "fd-rlbl"));
+      }
+    };
+    const mainEnd = Math.max(sl.size * 8,
+      ...segs.filter((g) => !(g.isExtra && g.extraKind === "separate"))
+             .map((g) => g.startBits + g.widthBits));
+    drawRuler(0, mainEnd, 0);
+    for (const g of segs) {
+      if (g.isExtra && g.extraKind === "separate") {
+        drawRuler(g.startBits, g.startBits + g.widthBits, 0);
+      }
     }
     cy = ry + 26;
   }
@@ -327,5 +352,5 @@ export function renderStruct(sl, userOpts = {}) {
     ? `style="width:100%;max-width:${width}px;height:auto"`
     : `width="${width}" height="${height}"`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" ` +
-    `${dims}>\n${styleBlock(opts.theme)}\n${bg}${HATCH}\n` + parts.join("\n") + "\n</svg>";
+    `${dims}>\n${styleBlock(opts.theme, opts.extraCss)}\n${bg}${HATCH}\n` + parts.join("\n") + "\n</svg>";
 }

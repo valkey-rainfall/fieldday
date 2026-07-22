@@ -216,8 +216,11 @@ class Parser {
 
   registerStruct(name, tag, rawFields, emitted) {
     const info = this.computeLayout(rawFields, name);
-    this.structs.set(name, { size: info.size, align: info.align, emitted });
-    if (tag) this.structs.set(`struct ${tag}`, { size: info.size, align: info.align, emitted });
+    // internal boundaries for nested-struct dividers (pads included)
+    const bounds = [...new Set(info.fields.filter((f) => f.offset > 0)
+      .map((f) => f.offset))].sort((a, b) => a - b);
+    this.structs.set(name, { size: info.size, align: info.align, emitted, bounds });
+    if (tag) this.structs.set(`struct ${tag}`, { size: info.size, align: info.align, emitted, bounds });
     if (emitted) {
       this.layouts.set(name, info);
       this.emitOrder.push(name);
@@ -251,10 +254,18 @@ class Parser {
         maxAlign = Math.max(maxAlign, elemAlign);
         let byteCursor = Math.ceil(bitCursor / 8);
         byteCursor = Math.ceil(byteCursor / elemAlign) * elemAlign;
+        let dividers = null;
+        if (f.arrayLen !== null && f.arrayLen > 1 && totalSize % f.arrayLen === 0) {
+          dividers = [];
+          for (let k = 1; k < f.arrayLen; k++) dividers.push(k * elemSize);
+        } else if (f.structRef && !f.isPointer) {
+          const ref = this.structs.get(f.structRef);
+          if (ref && ref.bounds && ref.bounds.length) dividers = ref.bounds.slice();
+        }
         out.push({ name: f.name, offset: byteCursor,
                    size: f.arrayLen === 0 ? 0 : totalSize,
                    bit_offset: null, bit_width: null,
-                   isPointer: f.isPointer, structRef: f.structRef });
+                   isPointer: f.isPointer, structRef: f.structRef, dividers });
         bitCursor = (byteCursor + (f.arrayLen === 0 ? 0 : totalSize)) * 8;
       }
     }
@@ -309,6 +320,7 @@ export function computeLayouts(snippetText) {
         d.bit_width = f.bit_width;
       }
       if (f.structRef) d.struct_ref = f.structRef;
+      if (f.dividers && f.dividers.length) d.dividers = f.dividers;
       return d;
     }),
   }));
