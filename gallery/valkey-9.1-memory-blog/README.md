@@ -5,3 +5,4 @@ embedding stories. Render at matched scale:
 
     fieldday --from-json embstr_pair.json --px-per-byte 14
     fieldday --from-json zslnode_pair.json --px-per-byte 14
+    fieldday --from-json threshold_pair.json --px-per-byte 7 --jemalloc-slack
