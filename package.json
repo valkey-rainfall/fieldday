@@ -1,0 +1,10 @@
+{
+  "name": "fieldday-web",
+  "private": true,
+  "type": "module",
+  "description": "Browser build of fieldday (docs/) with golden-vector cross-validation tests",
+  "scripts": {
+    "test": "node tests/js/run_vectors.mjs && node tests/js/run_geometry.mjs",
+    "test:parity": "tests/js/run_parity.sh"
+  }
+}

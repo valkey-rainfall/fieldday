@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main, scaffold]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install package
+        run: |
+          python -m pip install -q -e .[dev]
+
+      - name: Python tests (compiler-probe layout + renderer + CLI)
+        run: pytest -q
+
+      - name: Golden vector drift check
+        # Regenerate vectors with the reference implementation; any diff
+        # means the JS engine's golden data is stale relative to the
+        # compiler-verified truth.
+        run: |
+          python tools/gen_vectors.py
+          git diff --exit-code tests/vectors.json
+
+      - name: JS layout engine vs golden vectors
+        run: node tests/js/run_vectors.mjs
+
+      - name: JS renderer geometry invariants
+        run: node tests/js/run_geometry.mjs
+
+      - name: Python/JS renderer parity (byte-identical SVG)
+        run: tests/js/run_parity.sh python

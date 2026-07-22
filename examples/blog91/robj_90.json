@@ -1,0 +1,62 @@
+{
+  "structs": [
+    {
+      "name": "robj_90",
+      "size": 16,
+      "align": 8,
+      "fields": [
+        {
+          "name": "type",
+          "type_str": "unsigned",
+          "offset": 0,
+          "size": 0,
+          "bit_offset": 0,
+          "bit_width": 4
+        },
+        {
+          "name": "encoding",
+          "type_str": "unsigned",
+          "offset": 0,
+          "size": 0,
+          "bit_offset": 4,
+          "bit_width": 4
+        },
+        {
+          "name": "lru",
+          "type_str": "unsigned",
+          "offset": 1,
+          "size": 0,
+          "bit_offset": 8,
+          "bit_width": 24
+        },
+        {
+          "name": "refcount",
+          "type_str": "int",
+          "offset": 4,
+          "size": 4
+        },
+        {
+          "name": "ptr",
+          "type_str": "void *",
+          "offset": 8,
+          "size": 8,
+          "is_pointer": true
+        }
+      ],
+      "extras": [
+        {
+          "label": "key sds (10B + hdr)",
+          "bytes": 14,
+          "kind": "embedded"
+        },
+        {
+          "label": "value sds (20B + hdr)",
+          "bytes": 25,
+          "kind": "embedded"
+        }
+      ],
+      "note": "55 bytes per embstr key/value object",
+      "title": "Valkey 9.0: string object (10B key, 20B value)"
+    }
+  ]
+}
