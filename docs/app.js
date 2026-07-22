@@ -107,15 +107,17 @@ function saveAnnFields() {
     note: $("note").value,
     extras: $("extras").value,
     relabel: $("relabel").value,
+    arrows: $("arrows").value,
   };
 }
 
 function loadAnnFields(name) {
-  const a = annStore[name] || { title: "", note: "", extras: "", relabel: "" };
+  const a = annStore[name] || { title: "", note: "", extras: "", relabel: "", arrows: "" };
   $("title").value = a.title;
   $("note").value = a.note;
   $("extras").value = a.extras;
   $("relabel").value = a.relabel;
+  $("arrows").value = a.arrows || "";
   annCurrent = name;
 }
 
@@ -134,7 +136,15 @@ function parseExtras(text) {
     if (kind !== "embedded" && kind !== "separate") {
       throw new LayoutError(`bad extras kind '${parts[2]}' (embedded or separate)`);
     }
-    extras.push({ label: parts[0], bytes, kind });
+    const extra = { label: parts[0], bytes, kind };
+    if (parts[3]) {
+      extra.dividers = parts[3].split(",").map((d) => parseInt(d.trim(), 10));
+      if (extra.dividers.some((d) => !Number.isFinite(d) || d <= 0 || d >= bytes)) {
+        throw new LayoutError(
+          `bad extras dividers '${parts[3]}' (comma-separated byte offsets within the item)`);
+      }
+    }
+    extras.push(extra);
   }
   return extras;
 }
@@ -152,6 +162,29 @@ function parseRelabel(text) {
     relabel[member] = line.slice(bar + 1).trim();
   }
   return relabel;
+}
+
+function parseArrows(text) {
+  const arrows = [];
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    const parts = line.split("|").map((s) => s.trim());
+    if (parts.length < 2 || !parts[0] || !parts[1]) {
+      throw new LayoutError(
+        `bad arrow line: '${line}' (expected: from member | to member/extra [| byte offset])`);
+    }
+    const arrow = { from: parts[0], to: parts[1] };
+    if (parts[2]) {
+      const off = parseFloat(parts[2]);
+      if (!Number.isFinite(off) || off < 0) {
+        throw new LayoutError(`bad arrow offset '${parts[2]}' (bytes into the target)`);
+      }
+      arrow.to_offset = off;
+    }
+    arrows.push(arrow);
+  }
+  return arrows;
 }
 
 function selectedStructIndex() {
@@ -200,6 +233,7 @@ function annotate(sl) {
   if (a.note && a.note.trim()) copy.note = a.note.trim();
   copy.extras = parseExtras(a.extras || "");
   copy.relabel = parseRelabel(a.relabel || "");
+  copy.arrows = parseArrows(a.arrows || "");
   return copy;
 }
 
@@ -270,7 +304,7 @@ for (const id of ["theme", "ppb", "ruler", "padcallout", "transparent",
   $(id).addEventListener("change", rerender);
   $(id).addEventListener("input", scheduleRender);
 }
-for (const id of ["title", "note", "extras", "relabel"]) {
+for (const id of ["title", "note", "extras", "relabel", "arrows"]) {
   $(id).addEventListener("input", () => { saveAnnFields(); scheduleRender(); });
 }
 $("structpick").addEventListener("change", () => {

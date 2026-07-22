@@ -118,7 +118,8 @@ function segmentsFromLayout(sl, opts) {
     const widthBits = Math.trunc(extra.bytes) * 8;
     if (kind === "separate") cursor += SEP_GAP_BITS;
     segs.push({ label: extra.label, startBits: cursor, widthBits,
-                isExtra: true, extraKind: kind });
+                isExtra: true, extraKind: kind,
+                dividersBits: (extra.dividers || []).map((d) => d * 8) });
     cursor += widthBits;
   }
   return segs;
@@ -417,7 +418,12 @@ export function renderStruct(sl, userOpts = {}) {
         throw new Error(`arrow endpoint not found: '${src}' -> '${dst}' ` +
           "(use a member name or an extra's label)");
       }
-      if (dst in starts) tx += 5;
+      if ("to_offset" in arrow && dst in starts) {
+        // exact byte offset within the target (e.g. past an sds header)
+        tx = starts[dst] + Number(arrow.to_offset) * ppb;
+      } else if (dst in starts) {
+        tx += 5;
+      }
       const lane = lane0 + i * 13;
       parts.push(`<path class="fd-pointer-arrow" d="M ${f1(fx)} ${f1(barBottom + 2)} ` +
         `V ${f1(lane)} H ${f1(tx)} V ${f1(barBottom + 8)}"/>`);

@@ -284,3 +284,19 @@ class TestAnnotations:
         sl.note_style = "savings"
         svg = render_struct(sl, RenderOptions())
         assert 'class="fd-note"' in svg and "\u25bc 8 bytes saved" in svg
+
+    def test_extra_dividers_drawn(self):
+        sl = self._layout(extras=[{"label": "sds", "bytes": 24, "kind": "embedded",
+                                   "dividers": [3, 23]}])
+        svg = render_struct(sl, RenderOptions())
+        assert svg.count('class="fd-subdivision-line"') == 2
+
+    def test_arrow_to_offset(self):
+        sl = self._layout(extras=[{"label": "sds", "bytes": 24, "kind": "embedded"}])
+        sl.arrows = [{"from": "a", "to": "sds", "to_offset": 3}]
+        opts = RenderOptions()
+        svg = render_struct(sl, opts)
+        import re as _re
+        head = _re.search(r'fd-pointer-head" points="[-\d.]+,[-\d.]+ [-\d.]+,[-\d.]+ ([-\d.]+),', svg)
+        # extras start at struct end (8B); +3B offset at 15 px/byte, margin 24
+        assert abs(float(head.group(1)) - (24 + (8 + 3) * 15)) < 0.11

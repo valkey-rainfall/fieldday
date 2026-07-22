@@ -131,7 +131,8 @@ def segments_from_layout(sl: StructLayout, opts: RenderOptions) -> list[Segment]
         if kind == "separate":
             cursor += SEP_GAP_BITS  # visual gap; '+' drawn in the gap
         segs.append(Segment(extra["label"], cursor, width_bits,
-                            is_extra=True, extra_kind=kind))
+                            is_extra=True, extra_kind=kind,
+                            dividers_bits=tuple(d * 8 for d in extra.get("dividers", ()))))
         cursor += width_bits
     return segs
 
@@ -420,7 +421,10 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
                 raise ValueError(
                     f"arrow endpoint not found: {src!r} -> {dst!r} "
                     f"(use a member name or an extra's label)")
-            if dst in starts:
+            if "to_offset" in arrow and dst in starts:
+                # exact byte offset within the target (e.g. past an sds header)
+                tx = starts[dst] + float(arrow["to_offset"]) * ppb
+            elif dst in starts:
                 tx += 5  # point at the start of the target, slightly inset
             lane = lane0 + i * 13
             parts.append(

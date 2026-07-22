@@ -49,9 +49,13 @@
         <label>Note <span class="hint">(green savings line)</span>
           <input type="text" id="note" placeholder="e.g. 51 bytes in 1 allocation — 15% smaller">
         </label>
-        <label>Extras <span class="hint">(one per line: label | bytes | embedded or separate)</span>
+        <label>Extras <span class="hint">(one per line: label | bytes | embedded/separate [| divider offsets])</span>
           <textarea id="extras" rows="3" spellcheck="false"
             placeholder="element sds (16B + hdr) | 19 | embedded"></textarea>
+        </label>
+        <label>Pointer arrows <span class="hint">(one per line: from member | to member/extra [| byte offset into target])</span>
+          <textarea id="arrows" rows="2" spellcheck="false"
+            placeholder="ptr | value sds (20B + hdr) | 3"></textarea>
         </label>
         <label>Relabel members <span class="hint">(one per line: member | new label &mdash; empty label hides it)</span>
           <textarea id="relabel" rows="3" spellcheck="false"
