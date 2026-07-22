@@ -174,3 +174,10 @@ tests/js/run_parity.sh              # Python and JS renderers byte-identical
 The Python implementation is the reference: new layout semantics land there
 first, flow into `tests/vectors.json` via the generator, and the JS engine
 must reproduce every vector exactly.
+
+## License
+
+BSD 3-Clause (see `LICENSE`). The web app vendors CodeMirror 6 and its
+dependencies (all MIT) as a minified bundle; their copyright and
+permission notices ship alongside it in `docs/vendor/LICENSES.txt`,
+regenerated automatically by `npm run build:editor`.
