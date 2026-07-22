@@ -6,21 +6,72 @@
       "align": 8,
       "title": "Before: ptr points at the value stored just bytes away",
       "fields": [
-        {"name": "type", "offset": 0, "size": 0, "bit_offset": 0, "bit_width": 4},
-        {"name": "encoding", "offset": 0, "size": 0, "bit_offset": 4, "bit_width": 4},
-        {"name": "lru", "offset": 1, "size": 0, "bit_offset": 8, "bit_width": 24},
-        {"name": "refcount", "offset": 4, "size": 4},
-        {"name": "ptr", "offset": 8, "size": 8, "is_pointer": true}
+        {
+          "name": "type",
+          "offset": 0,
+          "size": 0,
+          "bit_offset": 0,
+          "bit_width": 4
+        },
+        {
+          "name": "encoding",
+          "offset": 0,
+          "size": 0,
+          "bit_offset": 4,
+          "bit_width": 4
+        },
+        {
+          "name": "lru",
+          "offset": 1,
+          "size": 0,
+          "bit_offset": 8,
+          "bit_width": 24
+        },
+        {
+          "name": "refcount",
+          "offset": 4,
+          "size": 4
+        },
+        {
+          "name": "ptr",
+          "offset": 8,
+          "size": 8,
+          "is_pointer": true
+        }
       ],
       "extras": [
-        {"label": "key hdr size", "bytes": 1, "kind": "embedded"},
-        {"label": "key sds (10B + hdr)", "bytes": 14, "kind": "embedded"},
-        {"label": "value sds (20B + hdr)", "bytes": 24, "kind": "embedded"}
+        {
+          "label": "key hdr size",
+          "bytes": 1,
+          "kind": "embedded"
+        },
+        {
+          "label": "key sds (10B + hdr)",
+          "bytes": 14,
+          "kind": "embedded",
+          "dividers": [
+            3,
+            13
+          ]
+        },
+        {
+          "label": "value sds (20B + hdr)",
+          "bytes": 24,
+          "kind": "embedded",
+          "dividers": [
+            3,
+            23
+          ]
+        }
       ],
       "arrows": [
-        {"from": "ptr", "to": "value sds (20B + hdr)"}
+        {
+          "from": "ptr",
+          "to": "value sds (20B + hdr)",
+          "to_offset": 3
+        }
       ],
-      "note": "the pointer spends 8 bytes to locate a value that always follows it"
+      "note": "ptr locates the first content byte, just past the value's sds header \u2014 8 bytes spent pointing at data that always follows"
     },
     {
       "name": "embstr_after",
@@ -28,15 +79,57 @@
       "align": 8,
       "title": "Valkey 9.1: the embedded data moves into the former ptr slot",
       "fields": [
-        {"name": "type", "offset": 0, "size": 0, "bit_offset": 0, "bit_width": 4},
-        {"name": "encoding", "offset": 0, "size": 0, "bit_offset": 4, "bit_width": 4},
-        {"name": "lru", "offset": 1, "size": 0, "bit_offset": 8, "bit_width": 24},
-        {"name": "refcount", "offset": 4, "size": 4}
+        {
+          "name": "type",
+          "offset": 0,
+          "size": 0,
+          "bit_offset": 0,
+          "bit_width": 4
+        },
+        {
+          "name": "encoding",
+          "offset": 0,
+          "size": 0,
+          "bit_offset": 4,
+          "bit_width": 4
+        },
+        {
+          "name": "lru",
+          "offset": 1,
+          "size": 0,
+          "bit_offset": 8,
+          "bit_width": 24
+        },
+        {
+          "name": "refcount",
+          "offset": 4,
+          "size": 4
+        }
       ],
       "extras": [
-        {"label": "key hdr size", "bytes": 1, "kind": "embedded"},
-        {"label": "key sds (10B + hdr)", "bytes": 14, "kind": "embedded"},
-        {"label": "value sds (20B + hdr)", "bytes": 24, "kind": "embedded"}
+        {
+          "label": "key hdr size",
+          "bytes": 1,
+          "kind": "embedded"
+        },
+        {
+          "label": "key sds (10B + hdr)",
+          "bytes": 14,
+          "kind": "embedded",
+          "dividers": [
+            3,
+            13
+          ]
+        },
+        {
+          "label": "value sds (20B + hdr)",
+          "bytes": 24,
+          "kind": "embedded",
+          "dividers": [
+            3,
+            23
+          ]
+        }
       ],
       "note": "8 bytes saved on every embstr object",
       "note_style": "savings"

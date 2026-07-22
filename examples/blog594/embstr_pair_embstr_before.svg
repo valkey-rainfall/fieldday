@@ -34,7 +34,11 @@
 <rect class="fd-field-box" x="136.0" y="124.0" width="112.0" height="56" rx="4"/>
 <rect class="fd-extra-box" x="248.0" y="124.0" width="14.0" height="56" rx="4"/>
 <rect class="fd-extra-box" x="262.0" y="124.0" width="196.0" height="56" rx="4"/>
+<line class="fd-subdivision-line" x1="304.0" y1="127.0" x2="304.0" y2="177.0"/>
+<line class="fd-subdivision-line" x1="444.0" y1="127.0" x2="444.0" y2="177.0"/>
 <rect class="fd-extra-box" x="458.0" y="124.0" width="336.0" height="56" rx="4"/>
+<line class="fd-subdivision-line" x1="500.0" y1="127.0" x2="500.0" y2="177.0"/>
+<line class="fd-subdivision-line" x1="780.0" y1="127.0" x2="780.0" y2="177.0"/>
 <text class="fd-field-label" x="192.0" y="157.0" font-size="15" font-weight="700" text-anchor="middle">*ptr</text>
 <text class="fd-callout-label" x="360.0" y="157.0" font-size="15" font-weight="700" text-anchor="middle">key sds (10B + hdr)</text>
 <text class="fd-callout-label" x="626.0" y="157.0" font-size="15" font-weight="700" text-anchor="middle">value sds (20B + hdr)</text>
@@ -65,7 +69,7 @@
 <text class="fd-ruler-label" x="696.0" y="208.0" font-size="11" font-weight="600" text-anchor="middle">48</text>
 <line class="fd-ruler-line" x1="794.0" y1="188" x2="794.0" y2="194"/>
 <text class="fd-ruler-label" x="794.0" y="208.0" font-size="11" font-weight="600" text-anchor="middle">55</text>
-<path class="fd-pointer-arrow" d="M 192.0 182.0 V 224.0 H 463.0 V 188.0"/>
-<polygon class="fd-pointer-head" points="459.0,188.0 467.0,188.0 463.0,181.0"/>
-<text class="fd-note-plain" x="24.0" y="250.0" font-size="13" font-weight="600" text-anchor="start">the pointer spends 8 bytes to locate a value that always follows it</text>
+<path class="fd-pointer-arrow" d="M 192.0 182.0 V 224.0 H 500.0 V 188.0"/>
+<polygon class="fd-pointer-head" points="496.0,188.0 504.0,188.0 500.0,181.0"/>
+<text class="fd-note-plain" x="24.0" y="250.0" font-size="13" font-weight="600" text-anchor="start">ptr locates the first content byte, just past the value's sds header — 8 bytes spent pointing at data that always follows</text>
 </svg>

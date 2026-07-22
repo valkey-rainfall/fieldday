@@ -6,5 +6,8 @@
   "scripts": {
     "test": "node tests/js/run_vectors.mjs && node tests/js/run_geometry.mjs",
     "test:parity": "tests/js/run_parity.sh"
+  },
+  "devDependencies": {
+    "playwright-core": "1.49.1"
   }
 }

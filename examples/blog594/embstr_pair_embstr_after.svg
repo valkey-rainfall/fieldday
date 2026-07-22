@@ -33,7 +33,11 @@
 <rect class="fd-field-box" x="80.0" y="124.0" width="56.0" height="56" rx="4"/>
 <rect class="fd-extra-box" x="136.0" y="124.0" width="14.0" height="56" rx="4"/>
 <rect class="fd-extra-box" x="150.0" y="124.0" width="196.0" height="56" rx="4"/>
+<line class="fd-subdivision-line" x1="192.0" y1="127.0" x2="192.0" y2="177.0"/>
+<line class="fd-subdivision-line" x1="332.0" y1="127.0" x2="332.0" y2="177.0"/>
 <rect class="fd-extra-box" x="346.0" y="124.0" width="336.0" height="56" rx="4"/>
+<line class="fd-subdivision-line" x1="388.0" y1="127.0" x2="388.0" y2="177.0"/>
+<line class="fd-subdivision-line" x1="668.0" y1="127.0" x2="668.0" y2="177.0"/>
 <text class="fd-callout-label" x="248.0" y="157.0" font-size="15" font-weight="700" text-anchor="middle">key sds (10B + hdr)</text>
 <text class="fd-callout-label" x="514.0" y="157.0" font-size="15" font-weight="700" text-anchor="middle">value sds (20B + hdr)</text>
 <text class="fd-callout-label" x="46.3" y="70.0" font-size="12" font-weight="600" text-anchor="middle">type:4</text>
