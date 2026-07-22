@@ -223,6 +223,8 @@ function styleBlock(theme, extraCss = "") {
   .fd-ruler-line   { stroke: var(--fd-muted, ${t["muted"]}); stroke-width: 1; }
   .fd-cache-line   { stroke: var(--fd-text, ${t["text"]}); stroke-width: 3; stroke-dasharray: 7 4; opacity: 0.8; }
   .fd-cache-line-label    { fill: var(--fd-text, ${t["text"]}); }
+  .fd-pointer-arrow  { stroke: var(--fd-text, ${t["text"]}); stroke-width: 1.5; fill: none; }
+  .fd-pointer-head   { fill: var(--fd-text, ${t["text"]}); }
   .fd-ruler-label    { fill: var(--fd-muted, ${t["muted"]}); }
   .fd-note  { fill: var(--fd-highlight, ${t["highlight"]}); }
   text        { font-family: var(--fd-font, ${t["font"]}); }
@@ -385,6 +387,44 @@ export function renderStruct(sl, userOpts = {}) {
     };
     for (const [aStart, aEnd] of allocs) drawRuler(aStart, aEnd, 0);
     cy = ry + 26;
+  }
+
+  // pointer arrows: from a member's box down below the ruler, across,
+  // and up into the start of the target member/extra (arrowhead up)
+  if (sl.arrows && sl.arrows.length) {
+    const centers = {};
+    const starts = {};
+    for (const f of sl.fields) {
+      if (!f.is_padding) centers[f.name] = x0 + (f.offset + Math.max(f.size, 1) / 2) * ppb;
+    }
+    for (const g of segs) {
+      if (g.isExtra) {
+        centers[g.label] = x0 + (g.startBits + g.widthBits / 2) / 8 * ppb;
+        starts[g.label] = x0 + g.startBits / 8 * ppb;
+      } else if (!g.isPadding) {
+        const base = g.label.replace(/^\*/, "").split(":")[0].replace(/\[\]$/, "");
+        if (!(base in starts)) starts[base] = x0 + g.startBits / 8 * ppb;
+      }
+    }
+    const barBottom = barTop + opts.barHeight;
+    const lane0 = cy + 10;
+    sl.arrows.forEach((arrow, i) => {
+      const src = arrow.from, dst = arrow.to;
+      const fx = centers[src];
+      let tx = dst in starts ? starts[dst] : centers[dst];
+      if (fx === undefined || tx === undefined) {
+        throw new Error(`arrow endpoint not found: '${src}' -> '${dst}' ` +
+          "(use a member name or an extra's label)");
+      }
+      if (dst in starts) tx += 5;
+      const lane = lane0 + i * 13;
+      parts.push(`<path class="fd-pointer-arrow" d="M ${f1(fx)} ${f1(barBottom + 2)} ` +
+        `V ${f1(lane)} H ${f1(tx)} V ${f1(barBottom + 8)}"/>`);
+      parts.push(`<polygon class="fd-pointer-head" points="` +
+        `${f1(tx - 4)},${f1(barBottom + 8)} ${f1(tx + 4)},${f1(barBottom + 8)} ` +
+        `${f1(tx)},${f1(barBottom + 1)}"/>`);
+    });
+    cy = lane0 + (sl.arrows.length - 1) * 13 + 8;
   }
 
   // padding callout

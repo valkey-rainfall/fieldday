@@ -258,3 +258,17 @@ class TestAnnotations:
         assert max(rlbls) == 13
         assert 12 in rlbls
         assert rlbls.count(0) == 2
+
+    def test_pointer_arrow_rendered(self):
+        sl = self._layout(extras=[{"label": "data", "bytes": 16, "kind": "embedded"}])
+        sl.arrows = [{"from": "a", "to": "data"}]
+        svg = render_struct(sl, RenderOptions())
+        assert svg.count('class="fd-pointer-arrow"') == 1
+        assert svg.count('class="fd-pointer-head"') == 1
+
+    def test_pointer_arrow_bad_endpoint(self):
+        sl = self._layout()
+        sl.arrows = [{"from": "a", "to": "nope"}]
+        import pytest as _pytest
+        with _pytest.raises(ValueError, match="arrow endpoint"):
+            render_struct(sl, RenderOptions())
