@@ -31,10 +31,10 @@ BUILTIN_THEMES = {
     "valkey": {},  # DEFAULT_THEME: light scheme matching the valkey.io blog
     "light": {},   # alias for the default
     "dark": {
-        "bg": "#1a1a2e", "text": "#e0e0e0", "muted": "#8a8a9a",
-        "field": "#7fb3e0", "field-text": "#16213e",
-        "pad": "#2a2a3e", "pad-stroke": "#555568",
-        "border": "#444444", "accent": "#e0b97f",
+        "background": "#1a1a2e", "text": "#e0e0e0", "muted": "#8a8a9a",
+        "field-fill": "#7fb3e0", "field-text": "#16213e",
+        "padding-fill": "#2a2a3e", "padding-stroke": "#555568",
+        "field-border": "#444444", "highlight": "#e0b97f",
         "font": "ui-monospace, SFMono-Regular, 'Cascadia Code', monospace",
     },
 }

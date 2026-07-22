@@ -22,7 +22,7 @@ def render(snippet, **kw):
 
 def rects(svg, cls):
     out = []
-    for m in re.finditer(r'<rect class="(fd-field|fd-pad)" x="(-?[\d.]+)" y="(-?[\d.]+)" '
+    for m in re.finditer(r'<rect class="(fd-field-box|fd-padding-box)" x="(-?[\d.]+)" y="(-?[\d.]+)" '
                          r'width="(-?[\d.]+)"', svg):
         if m.group(1) == cls or cls == "*":
             out.append((float(m.group(2)), float(m.group(4))))
@@ -32,11 +32,11 @@ def rects(svg, cls):
 def leader_segments(svg):
     """Extract leader polylines as lists of (x1,y1,x2,y2) segments."""
     segs = []
-    for m in re.finditer(r'<path class="fd-leader" d="M (-?[\d.]+) (-?[\d.]+) '
+    for m in re.finditer(r'<path class="fd-leader-line" d="M (-?[\d.]+) (-?[\d.]+) '
                          r'V (-?[\d.]+) H (-?[\d.]+) V (-?[\d.]+)"', svg):
         x1, y1, ey, tx, by = map(float, m.groups())
         segs.append([(x1, y1, x1, ey), (x1, ey, tx, ey), (tx, ey, tx, by)])
-    for m in re.finditer(r'<line class="fd-leader" x1="(-?[\d.]+)" y1="(-?[\d.]+)" '
+    for m in re.finditer(r'<line class="fd-leader-line" x1="(-?[\d.]+)" y1="(-?[\d.]+)" '
                          r'x2="(-?[\d.]+)" y2="(-?[\d.]+)"', svg):
         x1, y1, x2, y2 = map(float, m.groups())
         segs.append([(x1, y1, x2, y2)])
@@ -45,7 +45,7 @@ def leader_segments(svg):
 
 def callout_labels(svg):
     out = []
-    for m in re.finditer(r'<text class="fd-callout" x="(-?[\d.]+)" y="(-?[\d.]+)" '
+    for m in re.finditer(r'<text class="fd-callout-label" x="(-?[\d.]+)" y="(-?[\d.]+)" '
                          r'font-size="(\d+)"[^>]*>([^<]+)</text>', svg):
         x, y, size, text = float(m.group(1)), float(m.group(2)), int(m.group(3)), m.group(4)
         w = len(text) * size * 0.62
@@ -143,15 +143,15 @@ class TestCalloutGeometry:
 class TestOptions:
     def test_transparent_skips_bg(self):
         svg = render("struct s { long a; };", transparent=True)
-        assert 'class="fd-bg"' not in svg
+        assert 'class="fd-background"' not in svg
 
     def test_theme_override_baked(self):
-        svg = render("struct s { long a; };", theme={"field": "#123456"})
+        svg = render("struct s { long a; };", theme={"field-fill": "#123456"})
         assert "#123456" in svg
 
     def test_css_variables_present(self):
         svg = render("struct s { long a; };")
-        assert "var(--fd-field," in svg
+        assert "var(--fd-field-fill," in svg
 
     def test_padding_callout_opt_in(self):
         assert "bytes are padding" not in render("struct s { char c; long l; };")
@@ -164,10 +164,10 @@ class TestOptions:
 
     def test_cache_line_ticks(self):
         svg = render("struct s { char big[130]; };", px_per_byte=4)
-        assert svg.count('class="fd-cline"') == 2  # ticks at 64 and 128
-        assert 'class="fd-clbl"' in svg
+        assert svg.count('class="fd-cache-line"') == 2  # ticks at 64 and 128
+        assert 'class="fd-cache-line-label"' in svg
         svg0 = render("struct s { char big[130]; };", px_per_byte=4, cache_line=0)
-        assert 'fd-cline' not in svg0.split("</style>")[1]
+        assert 'fd-cache-line' not in svg0.split("</style>")[1]
 
 
 class TestAnnotations:
@@ -180,12 +180,12 @@ class TestAnnotations:
     def test_embedded_extra_renders_dashed(self):
         sl = self._layout(extras=[{"label": "elem (16B)", "bytes": 16, "kind": "embedded"}])
         svg = render_struct(sl, RenderOptions())
-        assert 'class="fd-extra"' in svg and "elem (16B)" in svg
+        assert 'class="fd-extra-box"' in svg and "elem (16B)" in svg
 
     def test_separate_extra_has_plus(self):
         sl = self._layout(extras=[{"label": "sds", "bytes": 16, "kind": "separate"}])
         svg = render_struct(sl, RenderOptions())
-        assert 'class="fd-plus"' in svg
+        assert 'class="fd-allocation-plus"' in svg
 
     def test_note_rendered_in_accent(self):
         sl = self._layout(note="51 bytes total")
@@ -211,28 +211,28 @@ class TestAnnotations:
         # embedded extras are the same allocation: main ruler spans them
         sl = self._layout(extras=[{"label": "e", "bytes": 16, "kind": "embedded"}])
         svg = render_struct(sl, RenderOptions())
-        rlbls = re.findall(r'class="fd-rlbl"[^>]*>(\d+)<', svg)
+        rlbls = re.findall(r'class="fd-ruler-label"[^>]*>(\d+)<', svg)
         assert max(int(x) for x in rlbls) == 24  # 8B struct + 16B embedded
 
     def test_separate_extra_gets_own_ruler(self):
         # separate allocations restart their ruler at 0
         sl = self._layout(extras=[{"label": "s", "bytes": 16, "kind": "separate"}])
         svg = render_struct(sl, RenderOptions())
-        rlbls = [int(x) for x in re.findall(r'class="fd-rlbl"[^>]*>(\d+)<', svg)]
+        rlbls = [int(x) for x in re.findall(r'class="fd-ruler-label"[^>]*>(\d+)<', svg)]
         assert max(rlbls) == 16          # separate ruler: 0..16
         assert rlbls.count(0) == 2       # two rulers, both starting at 0
 
     def test_extra_css_appended(self):
         sl = self._layout()
-        svg = render_struct(sl, RenderOptions(extra_css=".fd-field { fill: pink; }"))
-        assert ".fd-field { fill: pink; }" in svg
+        svg = render_struct(sl, RenderOptions(extra_css=".fd-field-box { fill: pink; }"))
+        assert ".fd-field-box { fill: pink; }" in svg
 
     def test_array_dividers_drawn(self):
         from fieldday.cparse import parse_snippet
         from fieldday.probe import compute_layouts
         sl = compute_layouts(parse_snippet("struct s { int x[5]; int tail; };"))[0]
         svg = render_struct(sl, RenderOptions())
-        assert svg.count('class="fd-subdiv"') == 4  # 5 elements -> 4 dividers
+        assert svg.count('class="fd-subdivision-line"') == 4  # 5 elements -> 4 dividers
 
     def test_relabel_and_hide(self):
         from fieldday.cparse import parse_snippet
@@ -253,7 +253,7 @@ class TestAnnotations:
             {"label": "e2", "bytes": 7, "kind": "embedded"},
         ])
         svg = render_struct(sl, RenderOptions())
-        rlbls = [int(x) for x in re.findall(r'class="fd-rlbl"[^>]*>(\d+)<', svg)]
+        rlbls = [int(x) for x in re.findall(r'class="fd-ruler-label"[^>]*>(\d+)<', svg)]
         # alloc 0: struct 8B + e1 5B = 13; alloc 1: s1 5B + e2 7B = 12
         assert max(rlbls) == 13
         assert 12 in rlbls

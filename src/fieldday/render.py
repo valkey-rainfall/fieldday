@@ -24,15 +24,15 @@ SEP_GAP_BITS = 16  # visual gap (2 'bytes') before a separate allocation bar
 # headings, brand blues #6983ff/#30176e, gray surface #e2e8f0, Open Sans
 # for prose, Fira Mono for code-ish labels).
 DEFAULT_THEME = {
-    "bg": "#ffffff",
+    "background": "#ffffff",
     "text": "#002a3a",
     "muted": "#666666",
-    "field": "#6983ff",
+    "field-fill": "#6983ff",
     "field-text": "#ffffff",
-    "pad": "#f5f7f7",
-    "pad-stroke": "#b9c2cc",
-    "border": "#30176e",
-    "accent": "#1e8e3e",
+    "padding-fill": "#f5f7f7",
+    "padding-stroke": "#b9c2cc",
+    "field-border": "#30176e",
+    "highlight": "#1e8e3e",
     "font": "'Fira Mono', Consolas, Menlo, Monaco, 'Courier New', monospace",
 }
 
@@ -101,7 +101,7 @@ def segments_from_layout(sl: StructLayout, opts: RenderOptions) -> list[Segment]
             name = ("*" + f.name) if f.is_pointer and not f.name.startswith("*") else f.name
             if custom is not None:
                 name = custom
-            segs.append(Segment("pad" if f.is_padding else name,
+            segs.append(Segment("padding-fill" if f.is_padding else name,
                                 f.offset * 8, f.size * 8,
                                 is_padding=f.is_padding,
                                 dividers_bits=tuple(d * 8 for d in (f.dividers or ()))))
@@ -160,7 +160,7 @@ def plan_labels(segs: list[Segment], opts: RenderOptions, x0: float):
         w = seg.width_bits / 8 * ppb
         if seg.is_padding:
             # padding is self-identifying by hatch; label only when roomy
-            inline.append((seg, "pad" if _text_w("pad", opts.font_size) + 8 <= w else ""))
+            inline.append((seg, "padding-fill" if _text_w("padding-fill", opts.font_size) + 8 <= w else ""))
             continue
         if not seg.label or _text_w(seg.label, opts.font_size) + 8 <= w:
             inline.append((seg, seg.label))
@@ -220,33 +220,33 @@ def _style_block(theme: dict, extra_css: str = "") -> str:
     t = {**DEFAULT_THEME, **theme}
     tail = ("\n" + extra_css.strip()) if extra_css.strip() else ""
     return f"""<style>
-  .fd-bg      {{ fill: var(--fd-bg, {t['bg']}); }}
+  .fd-background      {{ fill: var(--fd-background, {t['background']}); }}
   .fd-title   {{ fill: var(--fd-text, {t['text']}); }}
-  .fd-field   {{ fill: var(--fd-field, {t['field']}); stroke: var(--fd-border, {t['border']}); stroke-width: 1; }}
-  .fd-pad     {{ fill: url(#fd-hatch); stroke: var(--fd-pad-stroke, {t['pad-stroke']}); stroke-width: 1; }}
-  .fd-flex    {{ fill: none; stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; stroke-dasharray: 4 3; }}
-  .fd-extra   {{ fill: var(--fd-field, {t['field']}); fill-opacity: 0.55; stroke: var(--fd-border, {t['border']}); stroke-width: 1; stroke-dasharray: 5 3; }}
-  .fd-plus    {{ fill: var(--fd-muted, {t['muted']}); }}
-  .fd-label   {{ fill: var(--fd-field-text, {t['field-text']}); }}
-  .fd-padlbl  {{ fill: var(--fd-muted, {t['muted']}); }}
-  .fd-callout {{ fill: var(--fd-text, {t['text']}); }}
-  .fd-leader  {{ stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; fill: none; }}
-  .fd-ruler   {{ stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; }}
-  .fd-cline   {{ stroke: var(--fd-text, {t['text']}); stroke-width: 3; stroke-dasharray: 7 4; opacity: 0.8; }}
-  .fd-clbl    {{ fill: var(--fd-text, {t['text']}); }}
-  .fd-rlbl    {{ fill: var(--fd-muted, {t['muted']}); }}
-  .fd-accent  {{ fill: var(--fd-accent, {t['accent']}); }}
+  .fd-field-box   {{ fill: var(--fd-field-fill, {t['field-fill']}); stroke: var(--fd-field-border, {t['field-border']}); stroke-width: 1; }}
+  .fd-padding-box     {{ fill: url(#fd-hatch); stroke: var(--fd-padding-stroke, {t['padding-stroke']}); stroke-width: 1; }}
+  .fd-flexible-array    {{ fill: none; stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; stroke-dasharray: 4 3; }}
+  .fd-extra-box   {{ fill: var(--fd-field-fill, {t['field-fill']}); fill-opacity: 0.55; stroke: var(--fd-field-border, {t['field-border']}); stroke-width: 1; stroke-dasharray: 5 3; }}
+  .fd-allocation-plus    {{ fill: var(--fd-muted, {t['muted']}); }}
+  .fd-field-label   {{ fill: var(--fd-field-text, {t['field-text']}); }}
+  .fd-padding-label  {{ fill: var(--fd-muted, {t['muted']}); }}
+  .fd-callout-label {{ fill: var(--fd-text, {t['text']}); }}
+  .fd-leader-line  {{ stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; fill: none; }}
+  .fd-ruler-line   {{ stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; }}
+  .fd-cache-line   {{ stroke: var(--fd-text, {t['text']}); stroke-width: 3; stroke-dasharray: 7 4; opacity: 0.8; }}
+  .fd-cache-line-label    {{ fill: var(--fd-text, {t['text']}); }}
+  .fd-ruler-label    {{ fill: var(--fd-muted, {t['muted']}); }}
+  .fd-note  {{ fill: var(--fd-highlight, {t['highlight']}); }}
   text        {{ font-family: var(--fd-font, {t['font']}); }}
-  .fd-hatchbg {{ fill: var(--fd-pad, {t['pad']}); }}
-  .fd-hatchln {{ stroke: var(--fd-pad-stroke, {t['pad-stroke']}); stroke-width: 1.5; }}
-  .fd-subdiv  {{ stroke: var(--fd-field-text, {t['field-text']}); stroke-width: 1; stroke-dasharray: 2 3; opacity: 0.45; }}{tail}
+  .fd-hatch-background {{ fill: var(--fd-padding-fill, {t['padding-fill']}); }}
+  .fd-hatch-lines {{ stroke: var(--fd-padding-stroke, {t['padding-stroke']}); stroke-width: 1.5; }}
+  .fd-subdivision-line  {{ stroke: var(--fd-field-text, {t['field-text']}); stroke-width: 1; stroke-dasharray: 2 3; opacity: 0.45; }}{tail}
 </style>"""
 
 
 HATCH = ('<defs><pattern id="fd-hatch" width="6" height="6" '
          'patternTransform="rotate(45)" patternUnits="userSpaceOnUse">'
-         '<rect class="fd-hatchbg" width="6" height="6"/>'
-         '<line class="fd-hatchln" x1="0" y1="0" x2="0" y2="6"/></pattern></defs>')
+         '<rect class="fd-hatch-background" width="6" height="6"/>'
+         '<line class="fd-hatch-lines" x1="0" y1="0" x2="0" y2="6"/></pattern></defs>')
 
 
 def _text(x, y, s, size, cls, anchor="middle", weight="600"):
@@ -300,22 +300,22 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
         x = x0 + seg.start_bits / 8 * ppb
         w = seg.width_bits / 8 * ppb
         if seg.is_padding:
-            cls = "fd-pad"
+            cls = "fd-padding-box"
         elif seg.is_flex:
-            cls = "fd-flex"
+            cls = "fd-flexible-array"
         elif seg.is_extra:
-            cls = "fd-extra"
+            cls = "fd-extra-box"
             if seg.extra_kind == "separate":
                 gap_px = SEP_GAP_BITS / 8 * ppb
                 parts.append(_text(x - gap_px / 2, bar_top + opts.bar_height / 2 + 5,
-                                   "+", 17, "fd-plus", weight="700"))
+                                   "+", 17, "fd-allocation-plus", weight="700"))
         else:
-            cls = "fd-field"
+            cls = "fd-field-box"
         parts.append(f'<rect class="{cls}" x="{x:.1f}" y="{bar_top:.1f}" '
                      f'width="{w:.1f}" height="{opts.bar_height}" rx="{opts.corner_radius}"/>')
         for db in seg.dividers_bits:
             dx = x + db / 8 * ppb
-            parts.append(f'<line class="fd-subdiv" x1="{dx:.1f}" y1="{bar_top + 3:.1f}" '
+            parts.append(f'<line class="fd-subdivision-line" x1="{dx:.1f}" y1="{bar_top + 3:.1f}" '
                          f'x2="{dx:.1f}" y2="{bar_top + opts.bar_height - 3:.1f}"/>')
     # cache-line boundaries: bold dashed rules cutting through the bar
     # (and down to the ruler when present), per allocation
@@ -326,7 +326,7 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
             b = opts.cache_line
             while b <= n_bytes:
                 x = x0 + a_start / 8 * ppb + b * ppb
-                parts.append(f'<line class="fd-cline" x1="{x:.1f}" y1="{bar_top - 4:.1f}" '
+                parts.append(f'<line class="fd-cache-line" x1="{x:.1f}" y1="{bar_top - 4:.1f}" '
                              f'x2="{x:.1f}" y2="{rule_bottom:.1f}"/>')
                 b += opts.cache_line
 
@@ -334,20 +334,20 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
         if not txt:
             continue
         x = x0 + (seg.start_bits + seg.width_bits / 2) / 8 * ppb
-        cls = "fd-padlbl" if seg.is_padding else ("fd-callout" if seg.is_extra else "fd-label")
+        cls = "fd-padding-label" if seg.is_padding else ("fd-callout-label" if seg.is_extra else "fd-field-label")
         parts.append(_text(x, bar_top + opts.bar_height / 2 + 5, txt,
                            opts.font_size, cls, weight="700"))
 
     # callouts + leaders
     for c in callouts:
         parts.append(_text(c.label_x, callout_y, c.seg.label,
-                           opts.callout_font_size, "fd-callout"))
+                           opts.callout_font_size, "fd-callout-label"))
         top = callout_y + 4
         if c.elbow_y > 0:
-            parts.append(f'<path class="fd-leader" d="M {c.label_x:.1f} {top:.1f} '
+            parts.append(f'<path class="fd-leader-line" d="M {c.label_x:.1f} {top:.1f} '
                          f'V {c.elbow_y:.1f} H {c.target_x:.1f} V {bar_top - 1:.1f}"/>')
         else:
-            parts.append(f'<line class="fd-leader" x1="{c.label_x:.1f}" y1="{top:.1f}" '
+            parts.append(f'<line class="fd-leader-line" x1="{c.label_x:.1f}" y1="{top:.1f}" '
                          f'x2="{c.label_x:.1f}" y2="{bar_top - 1:.1f}"/>')
 
     cy = bar_top + opts.bar_height
@@ -362,7 +362,7 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
             rx1 = x0 + start_bits / 8 * ppb
             rx2 = x0 + end_bits / 8 * ppb
             n_bytes = (end_bits - start_bits) // 8
-            parts.append(f'<line class="fd-ruler" x1="{rx1:.1f}" y1="{ry}" x2="{rx2:.1f}" y2="{ry}"/>')
+            parts.append(f'<line class="fd-ruler-line" x1="{rx1:.1f}" y1="{ry}" x2="{rx2:.1f}" y2="{ry}"/>')
 
             def tick(b, cls, tlen, lblcls, weight):
                 x = rx1 + b * ppb
@@ -374,10 +374,10 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
             b = 0
             while b <= n_bytes:
                 if not (cl and b and b % cl == 0):
-                    tick(b, "fd-ruler", 6, "fd-rlbl", "600")
+                    tick(b, "fd-ruler-line", 6, "fd-ruler-label", "600")
                 b += opts.ruler_step
             if n_bytes % opts.ruler_step != 0 and not (cl and n_bytes % cl == 0):
-                tick(n_bytes, "fd-ruler", 6, "fd-rlbl", "600")
+                tick(n_bytes, "fd-ruler-line", 6, "fd-ruler-label", "600")
             # cache-line boundaries: bold label; the rule itself is the
             # full-height overlay drawn through the bar
             if cl:
@@ -385,7 +385,7 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
                 while b <= n_bytes:
                     x = rx1 + b * ppb
                     parts.append(_text(x, ry + 20, str(label_base + b), 12,
-                                       "fd-clbl", weight="700"))
+                                       "fd-cache-line-label", weight="700"))
                     b += cl
 
         for a_start, a_end in allocs:
@@ -398,12 +398,12 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
         cy += 18
         pct = round(pad_b * 100 / sl.size)
         parts.append(_text(x0, cy, f"\u25bc {pad_b} of {sl.size} bytes are padding ({pct}%)",
-                           13, "fd-accent", "start", "700"))
+                           13, "fd-note", "start", "700"))
 
     # hand-annotated note (savings line etc.)
     if sl.note:
         cy += 18
-        parts.append(_text(x0, cy, f"\u25bc {sl.note}", 13, "fd-accent", "start", "700"))
+        parts.append(_text(x0, cy, f"\u25bc {sl.note}", 13, "fd-note", "start", "700"))
 
     # canvas must fit callout labels and title, not just the bar
     content_right = x0 + total_px
@@ -413,7 +413,7 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
         content_right = max(content_right, x0 + _text_w(title, 15))
     width = int(content_right + m)
     height = int(cy + m / 2)
-    bg = "" if opts.transparent else f'<rect class="fd-bg" width="100%" height="100%" rx="8"/>\n'
+    bg = "" if opts.transparent else f'<rect class="fd-background" width="100%" height="100%" rx="8"/>\n'
     if opts.responsive:
         dims = f'style="width:100%;max-width:{width}px;height:auto"'
     else:

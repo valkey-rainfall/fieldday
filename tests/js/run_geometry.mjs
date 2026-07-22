@@ -19,19 +19,19 @@ function render(snippet, opts = {}) {
 
 function rects(svg) {
   const out = [];
-  const re = /<rect class="(fd-field|fd-pad)" x="(-?[\d.]+)" y="(-?[\d.]+)" width="(-?[\d.]+)"/g;
+  const re = /<rect class="(fd-field-box|fd-padding-box)" x="(-?[\d.]+)" y="(-?[\d.]+)" width="(-?[\d.]+)"/g;
   for (const m of svg.matchAll(re)) out.push([parseFloat(m[2]), parseFloat(m[4])]);
   return out;
 }
 
 function leaderSegments(svg) {
   const segs = [];
-  const pre = /<path class="fd-leader" d="M (-?[\d.]+) (-?[\d.]+) V (-?[\d.]+) H (-?[\d.]+) V (-?[\d.]+)"/g;
+  const pre = /<path class="fd-leader-line" d="M (-?[\d.]+) (-?[\d.]+) V (-?[\d.]+) H (-?[\d.]+) V (-?[\d.]+)"/g;
   for (const m of svg.matchAll(pre)) {
     const [x1, y1, ey, tx, by] = m.slice(1).map(parseFloat);
     segs.push([[x1, y1, x1, ey], [x1, ey, tx, ey], [tx, ey, tx, by]]);
   }
-  const lre = /<line class="fd-leader" x1="(-?[\d.]+)" y1="(-?[\d.]+)" x2="(-?[\d.]+)" y2="(-?[\d.]+)"/g;
+  const lre = /<line class="fd-leader-line" x1="(-?[\d.]+)" y1="(-?[\d.]+)" x2="(-?[\d.]+)" y2="(-?[\d.]+)"/g;
   for (const m of svg.matchAll(lre)) {
     const [x1, y1, x2, y2] = m.slice(1).map(parseFloat);
     segs.push([[x1, y1, x2, y2]]);
@@ -41,7 +41,7 @@ function leaderSegments(svg) {
 
 function calloutLabels(svg) {
   const out = [];
-  const re = /<text class="fd-callout" x="(-?[\d.]+)" y="(-?[\d.]+)" font-size="(\d+)"[^>]*>([^<]+)<\/text>/g;
+  const re = /<text class="fd-callout-label" x="(-?[\d.]+)" y="(-?[\d.]+)" font-size="(\d+)"[^>]*>([^<]+)<\/text>/g;
   for (const m of svg.matchAll(re)) {
     const x = parseFloat(m[1]), size = parseInt(m[3], 10), text = m[4];
     const w = text.length * size * 0.62;
@@ -132,13 +132,13 @@ for (const [name, snip] of Object.entries(NASTY)) {
 
 // options and annotations
 check("transparent_skips_bg", () => {
-  assert(!render("struct s { long a; };", { transparent: true }).includes('class="fd-bg"'), "bg present");
+  assert(!render("struct s { long a; };", { transparent: true }).includes('class="fd-background"'), "bg present");
 });
 check("theme_override_baked", () => {
-  assert(render("struct s { long a; };", { theme: { field: "#123456" } }).includes("#123456"), "theme color missing");
+  assert(render("struct s { long a; };", { theme: { "field-fill": "#123456" } }).includes("#123456"), "theme color missing");
 });
 check("css_variables_present", () => {
-  assert(render("struct s { long a; };").includes("var(--fd-field,"), "css vars missing");
+  assert(render("struct s { long a; };").includes("var(--fd-field-fill,"), "css vars missing");
 });
 check("padding_callout_opt_in", () => {
   assert(!render("struct s { char c; long l; };").includes("bytes are padding"), "callout not opt-in");
@@ -147,7 +147,7 @@ check("padding_callout_opt_in", () => {
 });
 check("cache_line_ticks", () => {
   const svg = render("struct s { char big[130]; };", { pxPerByte: 4 });
-  const n = (svg.split("</style>")[1].match(/class="fd-cline"/g) || []).length;
+  const n = (svg.split("</style>")[1].match(/class="fd-cache-line"/g) || []).length;
   assert(n === 2, `expected 2 cache-line ticks, got ${n}`);
 });
 check("embedded_after_separate_joins_that_allocation", () => {
@@ -158,7 +158,7 @@ check("embedded_after_separate_joins_that_allocation", () => {
     { label: "e2", bytes: 7, kind: "embedded" },
   ];
   const svg = renderStruct(sl);
-  const labels = [...svg.matchAll(/class="fd-rlbl"[^>]*>(\d+)</g)].map((m) => parseInt(m[1], 10));
+  const labels = [...svg.matchAll(/class="fd-ruler-label"[^>]*>(\d+)</g)].map((m) => parseInt(m[1], 10));
   assert(Math.max(...labels) === 13, `expected max 13, got ${Math.max(...labels)}`);
   assert(labels.includes(12), "separate allocation should end at 12");
   assert(labels.filter((x) => x === 0).length === 2, "expected two 0-origin rulers");
@@ -174,8 +174,8 @@ check("extras_and_note", () => {
   sl.note = "51 bytes total";
   sl.title = "Hand title";
   const svg = renderStruct(sl);
-  assert(svg.includes('class="fd-extra"'), "extra missing");
-  assert(svg.includes('class="fd-plus"'), "+ missing");
+  assert(svg.includes('class="fd-extra-box"'), "extra missing");
+  assert(svg.includes('class="fd-allocation-plus"'), "+ missing");
   assert(svg.includes("51 bytes total"), "note missing");
   assert(svg.includes("Hand title"), "title missing");
 });
@@ -183,26 +183,26 @@ check("ruler_continues_over_embedded", () => {
   const sl = computeLayouts("struct s { long a; };")[0];
   sl.extras = [{ label: "e", bytes: 16, kind: "embedded" }];
   const svg = renderStruct(sl);
-  const labels = [...svg.matchAll(/class="fd-rlbl"[^>]*>(\d+)</g)].map((m) => parseInt(m[1], 10));
+  const labels = [...svg.matchAll(/class="fd-ruler-label"[^>]*>(\d+)</g)].map((m) => parseInt(m[1], 10));
   assert(Math.max(...labels) === 24, `expected 24, got ${Math.max(...labels)}`);
 });
 check("separate_extra_own_ruler", () => {
   const sl = computeLayouts("struct s { long a; };")[0];
   sl.extras = [{ label: "s", bytes: 16, kind: "separate" }];
   const svg = renderStruct(sl);
-  const labels = [...svg.matchAll(/class="fd-rlbl"[^>]*>(\d+)</g)].map((m) => parseInt(m[1], 10));
+  const labels = [...svg.matchAll(/class="fd-ruler-label"[^>]*>(\d+)</g)].map((m) => parseInt(m[1], 10));
   assert(Math.max(...labels) === 16, `expected 16, got ${Math.max(...labels)}`);
   assert(labels.filter((x) => x === 0).length === 2, "expected two 0-origin rulers");
 });
 check("array_dividers_drawn", () => {
   const svg = renderStruct(computeLayouts("struct s { int x[5]; int tail; };")[0]);
-  const n = (svg.match(/class="fd-subdiv"/g) || []).length;
+  const n = (svg.match(/class="fd-subdivision-line"/g) || []).length;
   assert(n === 4, `expected 4 subdividers, got ${n}`);
 });
 check("extra_css_appended", () => {
   const svg = renderStruct(computeLayouts("struct s { long a; };")[0],
-                           { extraCss: ".fd-field { fill: pink; }" });
-  assert(svg.includes(".fd-field { fill: pink; }"), "custom css missing");
+                           { extraCss: ".fd-field-box { fill: pink; }" });
+  assert(svg.includes(".fd-field-box { fill: pink; }"), "custom css missing");
 });
 
 
@@ -220,7 +220,7 @@ check("bitfield_unit_padding_tiled", () => {
     "struct s { uint64_t a; unsigned f : 12; unsigned p : 1; void *q; };")[0],
     { pxPerByte: 16, margin: 20 });
   const boxes = [];
-  const re = /<rect class="(?:fd-field|fd-pad)" x="(-?[\d.]+)" y="(-?[\d.]+)" width="(-?[\d.]+)"/g;
+  const re = /<rect class="(?:fd-field-box|fd-padding-box)" x="(-?[\d.]+)" y="(-?[\d.]+)" width="(-?[\d.]+)"/g;
   for (const m of svg.matchAll(re)) boxes.push([parseFloat(m[1]), parseFloat(m[3])]);
   boxes.sort((a, b) => a[0] - b[0]);
   let cursor = boxes[0][0];

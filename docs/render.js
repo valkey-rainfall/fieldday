@@ -13,15 +13,15 @@ const SEP_GAP_BITS = 16;    // visual gap (2 'bytes') before a separate allocati
 
 // Default: light scheme matching the valkey.io blog.
 export const DEFAULT_THEME = {
-  "bg": "#ffffff",
+  "background": "#ffffff",
   "text": "#002a3a",
   "muted": "#666666",
-  "field": "#6983ff",
+  "field-fill": "#6983ff",
   "field-text": "#ffffff",
-  "pad": "#f5f7f7",
-  "pad-stroke": "#b9c2cc",
-  "border": "#30176e",
-  "accent": "#1e8e3e",
+  "padding-fill": "#f5f7f7",
+  "padding-stroke": "#b9c2cc",
+  "field-border": "#30176e",
+  "highlight": "#1e8e3e",
   "font": "'Fira Mono', Consolas, Menlo, Monaco, 'Courier New', monospace",
 };
 
@@ -29,10 +29,10 @@ export const THEMES = {
   valkey: {},
   light: {},
   dark: {
-    "bg": "#1a1a2e", "text": "#e0e0e0", "muted": "#8a8a9a",
-    "field": "#7fb3e0", "field-text": "#16213e",
-    "pad": "#2a2a3e", "pad-stroke": "#555568",
-    "border": "#444444", "accent": "#e0b97f",
+    "background": "#1a1a2e", "text": "#e0e0e0", "muted": "#8a8a9a",
+    "field-fill": "#7fb3e0", "field-text": "#16213e",
+    "padding-fill": "#2a2a3e", "padding-stroke": "#555568",
+    "field-border": "#444444", "highlight": "#e0b97f",
     "font": "ui-monospace, SFMono-Regular, 'Cascadia Code', monospace",
   },
 };
@@ -84,7 +84,7 @@ function segmentsFromLayout(sl, opts) {
     } else {
       let name = (f.is_pointer && !f.name.startsWith("*")) ? "*" + f.name : f.name;
       if (custom !== undefined) name = custom;
-      segs.push({ label: f.is_padding ? "pad" : name,
+      segs.push({ label: f.is_padding ? "padding-fill" : name,
                   startBits: f.offset * 8, widthBits: f.size * 8,
                   isPadding: !!f.is_padding,
                   dividersBits: (f.dividers || []).map((d) => d * 8) });
@@ -135,7 +135,7 @@ function planLabels(segs, opts, x0) {
   for (const seg of segs) {
     const w = seg.widthBits / 8 * ppb;
     if (seg.isPadding) {
-      inline.push([seg, textW("pad", opts.fontSize) + 8 <= w ? "pad" : ""]);
+      inline.push([seg, textW("padding-fill", opts.fontSize) + 8 <= w ? "padding-fill" : ""]);
       continue;
     }
     if (!seg.label || textW(seg.label, opts.fontSize) + 8 <= w) {
@@ -209,33 +209,33 @@ function styleBlock(theme, extraCss = "") {
   const t = { ...DEFAULT_THEME, ...theme };
   const tail = extraCss.trim() ? "\n" + extraCss.trim() : "";
   return `<style>
-  .fd-bg      { fill: var(--fd-bg, ${t["bg"]}); }
+  .fd-background      { fill: var(--fd-background, ${t["background"]}); }
   .fd-title   { fill: var(--fd-text, ${t["text"]}); }
-  .fd-field   { fill: var(--fd-field, ${t["field"]}); stroke: var(--fd-border, ${t["border"]}); stroke-width: 1; }
-  .fd-pad     { fill: url(#fd-hatch); stroke: var(--fd-pad-stroke, ${t["pad-stroke"]}); stroke-width: 1; }
-  .fd-flex    { fill: none; stroke: var(--fd-muted, ${t["muted"]}); stroke-width: 1; stroke-dasharray: 4 3; }
-  .fd-extra   { fill: var(--fd-field, ${t["field"]}); fill-opacity: 0.55; stroke: var(--fd-border, ${t["border"]}); stroke-width: 1; stroke-dasharray: 5 3; }
-  .fd-plus    { fill: var(--fd-muted, ${t["muted"]}); }
-  .fd-label   { fill: var(--fd-field-text, ${t["field-text"]}); }
-  .fd-padlbl  { fill: var(--fd-muted, ${t["muted"]}); }
-  .fd-callout { fill: var(--fd-text, ${t["text"]}); }
-  .fd-leader  { stroke: var(--fd-muted, ${t["muted"]}); stroke-width: 1; fill: none; }
-  .fd-ruler   { stroke: var(--fd-muted, ${t["muted"]}); stroke-width: 1; }
-  .fd-cline   { stroke: var(--fd-text, ${t["text"]}); stroke-width: 3; stroke-dasharray: 7 4; opacity: 0.8; }
-  .fd-clbl    { fill: var(--fd-text, ${t["text"]}); }
-  .fd-rlbl    { fill: var(--fd-muted, ${t["muted"]}); }
-  .fd-accent  { fill: var(--fd-accent, ${t["accent"]}); }
+  .fd-field-box   { fill: var(--fd-field-fill, ${t["field-fill"]}); stroke: var(--fd-field-border, ${t["field-border"]}); stroke-width: 1; }
+  .fd-padding-box     { fill: url(#fd-hatch); stroke: var(--fd-padding-stroke, ${t["padding-stroke"]}); stroke-width: 1; }
+  .fd-flexible-array    { fill: none; stroke: var(--fd-muted, ${t["muted"]}); stroke-width: 1; stroke-dasharray: 4 3; }
+  .fd-extra-box   { fill: var(--fd-field-fill, ${t["field-fill"]}); fill-opacity: 0.55; stroke: var(--fd-field-border, ${t["field-border"]}); stroke-width: 1; stroke-dasharray: 5 3; }
+  .fd-allocation-plus    { fill: var(--fd-muted, ${t["muted"]}); }
+  .fd-field-label   { fill: var(--fd-field-text, ${t["field-text"]}); }
+  .fd-padding-label  { fill: var(--fd-muted, ${t["muted"]}); }
+  .fd-callout-label { fill: var(--fd-text, ${t["text"]}); }
+  .fd-leader-line  { stroke: var(--fd-muted, ${t["muted"]}); stroke-width: 1; fill: none; }
+  .fd-ruler-line   { stroke: var(--fd-muted, ${t["muted"]}); stroke-width: 1; }
+  .fd-cache-line   { stroke: var(--fd-text, ${t["text"]}); stroke-width: 3; stroke-dasharray: 7 4; opacity: 0.8; }
+  .fd-cache-line-label    { fill: var(--fd-text, ${t["text"]}); }
+  .fd-ruler-label    { fill: var(--fd-muted, ${t["muted"]}); }
+  .fd-note  { fill: var(--fd-highlight, ${t["highlight"]}); }
   text        { font-family: var(--fd-font, ${t["font"]}); }
-  .fd-hatchbg { fill: var(--fd-pad, ${t["pad"]}); }
-  .fd-hatchln { stroke: var(--fd-pad-stroke, ${t["pad-stroke"]}); stroke-width: 1.5; }
-  .fd-subdiv  { stroke: var(--fd-field-text, ${t["field-text"]}); stroke-width: 1; stroke-dasharray: 2 3; opacity: 0.45; }${tail}
+  .fd-hatch-background { fill: var(--fd-padding-fill, ${t["padding-fill"]}); }
+  .fd-hatch-lines { stroke: var(--fd-padding-stroke, ${t["padding-stroke"]}); stroke-width: 1.5; }
+  .fd-subdivision-line  { stroke: var(--fd-field-text, ${t["field-text"]}); stroke-width: 1; stroke-dasharray: 2 3; opacity: 0.45; }${tail}
 </style>`;
 }
 
 const HATCH = '<defs><pattern id="fd-hatch" width="6" height="6" ' +
   'patternTransform="rotate(45)" patternUnits="userSpaceOnUse">' +
-  '<rect class="fd-hatchbg" width="6" height="6"/>' +
-  '<line class="fd-hatchln" x1="0" y1="0" x2="0" y2="6"/></pattern></defs>';
+  '<rect class="fd-hatch-background" width="6" height="6"/>' +
+  '<line class="fd-hatch-lines" x1="0" y1="0" x2="0" y2="6"/></pattern></defs>';
 
 function textEl(x, y, s, size, cls, anchor = "middle", weight = "600") {
   return `<text class="${cls}" x="${f1(x)}" y="${f1(y)}" font-size="${size}" ` +
@@ -297,21 +297,21 @@ export function renderStruct(sl, userOpts = {}) {
     const x = x0 + seg.startBits / 8 * ppb;
     const w = seg.widthBits / 8 * ppb;
     let cls;
-    if (seg.isPadding) cls = "fd-pad";
-    else if (seg.isFlex) cls = "fd-flex";
+    if (seg.isPadding) cls = "fd-padding-box";
+    else if (seg.isFlex) cls = "fd-flexible-array";
     else if (seg.isExtra) {
-      cls = "fd-extra";
+      cls = "fd-extra-box";
       if (seg.extraKind === "separate") {
         const gapPx = SEP_GAP_BITS / 8 * ppb;
         parts.push(textEl(x - gapPx / 2, barTop + opts.barHeight / 2 + 5,
-                          "+", 17, "fd-plus", "middle", "700"));
+                          "+", 17, "fd-allocation-plus", "middle", "700"));
       }
-    } else cls = "fd-field";
+    } else cls = "fd-field-box";
     parts.push(`<rect class="${cls}" x="${f1(x)}" y="${f1(barTop)}" ` +
       `width="${f1(w)}" height="${opts.barHeight}" rx="${opts.cornerRadius}"/>`);
     for (const db of seg.dividersBits || []) {
       const dx = x + db / 8 * ppb;
-      parts.push(`<line class="fd-subdiv" x1="${f1(dx)}" y1="${f1(barTop + 3)}" ` +
+      parts.push(`<line class="fd-subdivision-line" x1="${f1(dx)}" y1="${f1(barTop + 3)}" ` +
         `x2="${f1(dx)}" y2="${f1(barTop + opts.barHeight - 3)}"/>`);
     }
   }
@@ -323,7 +323,7 @@ export function renderStruct(sl, userOpts = {}) {
       const nBytes = Math.trunc((aEnd - aStart) / 8);
       for (let b = opts.cacheLine; b <= nBytes; b += opts.cacheLine) {
         const x = x0 + aStart / 8 * ppb + b * ppb;
-        parts.push(`<line class="fd-cline" x1="${f1(x)}" y1="${f1(barTop - 4)}" ` +
+        parts.push(`<line class="fd-cache-line" x1="${f1(x)}" y1="${f1(barTop - 4)}" ` +
           `x2="${f1(x)}" y2="${f1(ruleBottom)}"/>`);
       }
     }
@@ -332,20 +332,20 @@ export function renderStruct(sl, userOpts = {}) {
   for (const [seg, txt] of inline) {
     if (!txt) continue;
     const x = x0 + (seg.startBits + seg.widthBits / 2) / 8 * ppb;
-    const cls = seg.isPadding ? "fd-padlbl" : (seg.isExtra ? "fd-callout" : "fd-label");
+    const cls = seg.isPadding ? "fd-padding-label" : (seg.isExtra ? "fd-callout-label" : "fd-field-label");
     parts.push(textEl(x, barTop + opts.barHeight / 2 + 5, txt,
                       opts.fontSize, cls, "middle", "700"));
   }
 
   // callouts + leaders
   for (const c of callouts) {
-    parts.push(textEl(c.labelX, calloutY, c.seg.label, opts.calloutFontSize, "fd-callout"));
+    parts.push(textEl(c.labelX, calloutY, c.seg.label, opts.calloutFontSize, "fd-callout-label"));
     const top = calloutY + 4;
     if (c.elbowY > 0) {
-      parts.push(`<path class="fd-leader" d="M ${f1(c.labelX)} ${f1(top)} ` +
+      parts.push(`<path class="fd-leader-line" d="M ${f1(c.labelX)} ${f1(top)} ` +
         `V ${f1(c.elbowY)} H ${f1(c.targetX)} V ${f1(barTop - 1)}"/>`);
     } else {
-      parts.push(`<line class="fd-leader" x1="${f1(c.labelX)}" y1="${f1(top)}" ` +
+      parts.push(`<line class="fd-leader-line" x1="${f1(c.labelX)}" y1="${f1(top)}" ` +
         `x2="${f1(c.labelX)}" y2="${f1(barTop - 1)}"/>`);
     }
   }
@@ -361,7 +361,7 @@ export function renderStruct(sl, userOpts = {}) {
       const rx1 = x0 + startBits / 8 * ppb;
       const rx2 = x0 + endBits / 8 * ppb;
       const nBytes = Math.trunc((endBits - startBits) / 8);
-      parts.push(`<line class="fd-ruler" x1="${f1(rx1)}" y1="${ry}" x2="${f1(rx2)}" y2="${ry}"/>`);
+      parts.push(`<line class="fd-ruler-line" x1="${f1(rx1)}" y1="${ry}" x2="${f1(rx2)}" y2="${ry}"/>`);
       const tick = (b, cls, tlen, lblcls, weight) => {
         const x = rx1 + b * ppb;
         parts.push(`<line class="${cls}" x1="${f1(x)}" y1="${ry}" x2="${f1(x)}" y2="${ry + tlen}"/>`);
@@ -369,17 +369,17 @@ export function renderStruct(sl, userOpts = {}) {
       };
       const cl = opts.cacheLine;
       for (let b = 0; b <= nBytes; b += opts.rulerStep) {
-        if (!(cl && b && b % cl === 0)) tick(b, "fd-ruler", 6, "fd-rlbl", "600");
+        if (!(cl && b && b % cl === 0)) tick(b, "fd-ruler-line", 6, "fd-ruler-label", "600");
       }
       if (nBytes % opts.rulerStep !== 0 && !(cl && nBytes % cl === 0)) {
-        tick(nBytes, "fd-ruler", 6, "fd-rlbl", "600");
+        tick(nBytes, "fd-ruler-line", 6, "fd-ruler-label", "600");
       }
       // cache-line boundaries: bold label; the rule itself is the
       // full-height overlay drawn through the bar
       if (cl) {
         for (let b = cl; b <= nBytes; b += cl) {
           const x = rx1 + b * ppb;
-          parts.push(textEl(x, ry + 20, String(labelBase + b), 12, "fd-clbl", "middle", "700"));
+          parts.push(textEl(x, ry + 20, String(labelBase + b), 12, "fd-cache-line-label", "middle", "700"));
         }
       }
     };
@@ -396,13 +396,13 @@ export function renderStruct(sl, userOpts = {}) {
     let pct = Math.round(v);
     if (Math.abs(v - Math.trunc(v) - 0.5) < 1e-9) pct = 2 * Math.round(v / 2);
     parts.push(textEl(x0, cy, `\u25bc ${padB} of ${sl.size} bytes are padding (${pct}%)`,
-                      13, "fd-accent", "start", "700"));
+                      13, "fd-note", "start", "700"));
   }
 
   // hand-annotated note
   if (sl.note) {
     cy += 18;
-    parts.push(textEl(x0, cy, `\u25bc ${sl.note}`, 13, "fd-accent", "start", "700"));
+    parts.push(textEl(x0, cy, `\u25bc ${sl.note}`, 13, "fd-note", "start", "700"));
   }
 
   // canvas must fit callout labels and title, not just the bar
@@ -411,7 +411,7 @@ export function renderStruct(sl, userOpts = {}) {
   if (title) contentRight = Math.max(contentRight, x0 + textW(title, 15));
   const width = Math.trunc(contentRight + m);
   const height = Math.trunc(cy + m / 2);
-  const bg = opts.transparent ? "" : '<rect class="fd-bg" width="100%" height="100%" rx="8"/>\n';
+  const bg = opts.transparent ? "" : '<rect class="fd-background" width="100%" height="100%" rx="8"/>\n';
   const dims = opts.responsive
     ? `style="width:100%;max-width:${width}px;height:auto"`
     : `width="${width}" height="${height}"`;

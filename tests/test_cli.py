@@ -80,7 +80,7 @@ def test_light_theme_baked(cfile, tmp_path):
 
 def test_theme_file(cfile, tmp_path):
     tf = tmp_path / "t.json"
-    tf.write_text('{"field": "#abcdef"}')
+    tf.write_text('{"field-fill": "#abcdef"}')
     out = tmp_path / "t.svg"
     main([str(cfile), "--theme", str(tf), "-o", str(out)])
     assert "#abcdef" in out.read_text()

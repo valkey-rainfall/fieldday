@@ -93,15 +93,15 @@ Builtin themes: `dark` (default), `light`. Custom theme = JSON file with any
 subset of these keys:
 
 ```json
-{ "bg": "#ffffff", "text": "#1a1a2e", "muted": "#667788",
-  "field": "#4a90c2", "field-text": "#ffffff",
-  "pad": "#eceef2", "pad-stroke": "#b8bcc8",
-  "border": "#99aabb", "accent": "#b8860b",
+{ "background": "#ffffff", "text": "#1a1a2e", "muted": "#667788",
+  "field-fill": "#4a90c2", "field-text": "#ffffff",
+  "padding-fill": "#eceef2", "padding-stroke": "#b8bcc8",
+  "field-border": "#99aabb", "highlight": "#b8860b",
   "font": "ui-monospace, monospace" }
 ```
 
 Every color in the SVG also resolves through a CSS custom property
-(`--fd-bg`, `--fd-field`, `--fd-accent`, ...) with the theme value as
+(`--fd-background`, `--fd-field-fill`, `--fd-highlight`, ...) with the theme value as
 fallback. **Inline the SVG into a blog page and define `--fd-*` variables
 in the page's CSS** — the diagram follows the page theme, including dark/
 light mode switches, with no re-render. `--transparent` omits the background
