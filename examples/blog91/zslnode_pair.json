@@ -1,0 +1,95 @@
+{
+  "structs": [
+    {
+      "name": "zskiplistNode_90",
+      "size": 40,
+      "align": 8,
+      "fields": [
+        {
+          "name": "ele",
+          "type_str": "sds",
+          "offset": 0,
+          "size": 8,
+          "is_pointer": true
+        },
+        {
+          "name": "score",
+          "type_str": "double",
+          "offset": 8,
+          "size": 8
+        },
+        {
+          "name": "backward",
+          "type_str": "zskiplistNode *",
+          "offset": 16,
+          "size": 8,
+          "is_pointer": true
+        },
+        {
+          "name": "forward",
+          "type_str": "zskiplistNode *",
+          "offset": 24,
+          "size": 8,
+          "is_pointer": true
+        },
+        {
+          "name": "span",
+          "type_str": "unsigned long",
+          "offset": 32,
+          "size": 8
+        }
+      ],
+      "extras": [
+        {
+          "label": "element sds (16B + hdr)",
+          "bytes": 20,
+          "kind": "separate"
+        }
+      ],
+      "note": "60 bytes in 2 allocations per level-1 node",
+      "title": "Valkey 9.0: sorted-set node + element in separate allocations"
+    },
+    {
+      "name": "zskiplistNode_91",
+      "size": 32,
+      "align": 8,
+      "fields": [
+        {
+          "name": "score",
+          "type_str": "double",
+          "offset": 0,
+          "size": 8
+        },
+        {
+          "name": "backward",
+          "type_str": "zskiplistNode *",
+          "offset": 8,
+          "size": 8,
+          "is_pointer": true
+        },
+        {
+          "name": "forward",
+          "type_str": "zskiplistNode *",
+          "offset": 16,
+          "size": 8,
+          "is_pointer": true
+        },
+        {
+          "name": "span",
+          "type_str": "unsigned long",
+          "offset": 24,
+          "size": 8
+        }
+      ],
+      "extras": [
+        {
+          "label": "element sds (16B + hdr)",
+          "bytes": 19,
+          "kind": "embedded"
+        }
+      ],
+      "note": "51 bytes in 1 allocation \u2014 15% smaller, one less pointer chase",
+      "title": "Valkey 9.1: element embedded in the node (PR 2508)"
+    }
+  ]
+}

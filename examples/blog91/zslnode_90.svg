@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 423 186" width="423" height="186">
+<style>
+  .fd-bg      { fill: var(--fd-bg, #1a1a2e); }
+  .fd-title   { fill: var(--fd-text, #e0e0e0); }
+  .fd-field   { fill: var(--fd-field, #7fb3e0); stroke: var(--fd-border, #444444); stroke-width: 1; }
+  .fd-pad     { fill: url(#fd-hatch); stroke: var(--fd-pad-stroke, #555568); stroke-width: 1; }
+  .fd-flex    { fill: none; stroke: var(--fd-muted, #8a8a9a); stroke-width: 1; stroke-dasharray: 4 3; }
+  .fd-label   { fill: var(--fd-field-text, #16213e); }
+  .fd-padlbl  { fill: var(--fd-muted, #8a8a9a); }
+  .fd-callout { fill: var(--fd-text, #e0e0e0); }
+  .fd-leader  { stroke: var(--fd-muted, #8a8a9a); stroke-width: 1; fill: none; }
+  .fd-ruler   { stroke: var(--fd-muted, #8a8a9a); stroke-width: 1; }
+  .fd-rlbl    { fill: var(--fd-muted, #8a8a9a); }
+  .fd-accent  { fill: var(--fd-accent, #e0b97f); }
+  text        { font-family: var(--fd-font, ui-monospace, SFMono-Regular, 'Cascadia Code', monospace); }
+  .fd-hatchbg { fill: var(--fd-pad, #2a2a3e); }
+  .fd-hatchln { stroke: var(--fd-pad-stroke, #555568); stroke-width: 1.5; }
+</style>
+<rect class="fd-bg" width="100%" height="100%" rx="8"/>
+<defs><pattern id="fd-hatch" width="6" height="6" patternTransform="rotate(45)" patternUnits="userSpaceOnUse"><rect class="fd-hatchbg" width="6" height="6"/><line class="fd-hatchln" x1="0" y1="0" x2="0" y2="6"/></pattern></defs>
+<text class="fd-title" x="24.0" y="38.0" font-size="15" font-weight="700" text-anchor="start">zskiplistNode — 9.0 (+ separate sds element)</text>
+<rect class="fd-field" x="24.0" y="84.0" width="120.0" height="56" rx="4"/>
+<rect class="fd-field" x="144.0" y="84.0" width="120.0" height="56" rx="4"/>
+<rect class="fd-field" x="264.0" y="84.0" width="120.0" height="56" rx="4"/>
+<rect class="fd-flex" x="384.0" y="84.0" width="15.0" height="56" rx="4"/>
+<text class="fd-label" x="84.0" y="117.0" font-size="15" font-weight="700" text-anchor="middle">ele</text>
+<text class="fd-label" x="204.0" y="117.0" font-size="15" font-weight="700" text-anchor="middle">score</text>
+<text class="fd-label" x="324.0" y="117.0" font-size="15" font-weight="700" text-anchor="middle">*backward</text>
+<text class="fd-callout" x="391.5" y="70.0" font-size="12" font-weight="600" text-anchor="middle">level[]</text>
+<line class="fd-leader" x1="391.5" y1="74.0" x2="391.5" y2="83.0"/>
+<line class="fd-ruler" x1="24" y1="148" x2="399.0" y2="148"/>
+<line class="fd-ruler" x1="24.0" y1="148" x2="24.0" y2="154"/>
+<text class="fd-rlbl" x="24.0" y="168.0" font-size="11" font-weight="600" text-anchor="middle">0</text>
+<line class="fd-ruler" x1="144.0" y1="148" x2="144.0" y2="154"/>
+<text class="fd-rlbl" x="144.0" y="168.0" font-size="11" font-weight="600" text-anchor="middle">8</text>
+<line class="fd-ruler" x1="264.0" y1="148" x2="264.0" y2="154"/>
+<text class="fd-rlbl" x="264.0" y="168.0" font-size="11" font-weight="600" text-anchor="middle">16</text>
+<line class="fd-ruler" x1="384.0" y1="148" x2="384.0" y2="154"/>
+<text class="fd-rlbl" x="384.0" y="168.0" font-size="11" font-weight="600" text-anchor="middle">24</text>
+</svg>

@@ -28,12 +28,14 @@ from .probe import (FieldLayout, ProbeError, StructLayout, compute_layouts,
 from .render import DEFAULT_THEME, RenderOptions, render_struct
 
 BUILTIN_THEMES = {
-    "dark": {},  # DEFAULT_THEME
-    "light": {
-        "bg": "#ffffff", "text": "#1a1a2e", "muted": "#667",
-        "field": "#4a90c2", "field-text": "#ffffff",
-        "pad": "#eceef2", "pad-stroke": "#b8bcc8",
-        "border": "#9aa", "accent": "#b8860b",
+    "valkey": {},  # DEFAULT_THEME: light scheme matching the valkey.io blog
+    "light": {},   # alias for the default
+    "dark": {
+        "bg": "#1a1a2e", "text": "#e0e0e0", "muted": "#8a8a9a",
+        "field": "#7fb3e0", "field-text": "#16213e",
+        "pad": "#2a2a3e", "pad-stroke": "#555568",
+        "border": "#444444", "accent": "#e0b97f",
+        "font": "ui-monospace, SFMono-Regular, 'Cascadia Code', monospace",
     },
 }
 
@@ -57,7 +59,9 @@ def layouts_from_json(text: str) -> list[StructLayout]:
     data = json.loads(text)
     out = []
     for s in data["structs"]:
-        sl = StructLayout(name=s["name"], size=s["size"], align=s.get("align", 8))
+        sl = StructLayout(name=s["name"], size=s["size"], align=s.get("align", 8),
+                          extras=s.get("extras", []), note=s.get("note"),
+                          title=s.get("title"))
         for f in s["fields"]:
             sl.fields.append(FieldLayout(
                 name=f["name"], type_str=f.get("type_str", ""),
@@ -86,11 +90,14 @@ def main(argv=None) -> int:
                     help="render only this struct (default: all, suffixed files)")
     ap.add_argument("--emit-json", action="store_true",
                     help="print layout JSON to stdout instead of rendering")
-    ap.add_argument("--theme", default="dark", metavar="NAME|FILE",
-                    help="builtin theme (dark, light) or JSON theme file")
+    ap.add_argument("--theme", default="valkey", metavar="NAME|FILE",
+                    help="builtin theme (valkey/light default, dark) or JSON theme file")
     ap.add_argument("--title", help="diagram title (default: struct NAME)")
     ap.add_argument("--transparent", action="store_true",
                     help="no background rect (inherit page background)")
+    ap.add_argument("--responsive", action="store_true",
+                    help="fluid SVG width (100%% of container up to natural size; "
+                         "scales down gracefully on mobile)")
     ap.add_argument("--no-ruler", action="store_true", help="omit byte ruler")
     ap.add_argument("--no-padding-callout", action="store_true",
                     help="omit the 'N of M bytes are padding' line")
@@ -126,6 +133,7 @@ def main(argv=None) -> int:
         theme=load_theme(args.theme),
         title=args.title,
         transparent=args.transparent,
+        responsive=args.responsive,
         ruler=not args.no_ruler,
         padding_callout=not args.no_padding_callout,
         px_per_byte=args.px_per_byte,
@@ -140,8 +148,14 @@ def main(argv=None) -> int:
         if args.output and not multi:
             out = Path(args.output)
         else:
-            base = Path(args.output).parent if args.output else \
-                (Path(".") if args.input == "-" else Path(args.input).parent)
+            if args.output:
+                base = Path(args.output).parent
+            elif args.from_json:
+                base = Path(args.from_json).parent
+            elif args.input == "-":
+                base = Path(".")
+            else:
+                base = Path(args.input).parent
             out = base / (f"{in_name}_{sl.name}.svg" if multi else f"{in_name}.svg")
         out.write_text(svg)
         print(f"wrote {out} ({sl.name}: {sl.size}B, "

@@ -18,18 +18,22 @@ from pathlib import Path
 from .probe import StructLayout, FieldLayout
 
 CHAR_W = 0.62  # monospace width/em estimate
+SEP_GAP_BITS = 16  # visual gap (2 'bytes') before a separate allocation bar
 
+# Default: light scheme matching the valkey.io blog (white bg, #002a3a
+# headings, brand blues #6983ff/#30176e, gray surface #e2e8f0, Open Sans
+# for prose, Fira Mono for code-ish labels).
 DEFAULT_THEME = {
-    "bg": "#1a1a2e",
-    "text": "#e0e0e0",
-    "muted": "#8a8a9a",
-    "field": "#7fb3e0",
-    "field-text": "#16213e",
-    "pad": "#2a2a3e",
-    "pad-stroke": "#555568",
-    "border": "#444444",
-    "accent": "#e0b97f",
-    "font": "ui-monospace, SFMono-Regular, 'Cascadia Code', monospace",
+    "bg": "#ffffff",
+    "text": "#002a3a",
+    "muted": "#666666",
+    "field": "#6983ff",
+    "field-text": "#ffffff",
+    "pad": "#f5f7f7",
+    "pad-stroke": "#b9c2cc",
+    "border": "#30176e",
+    "accent": "#1e8e3e",
+    "font": "'Fira Mono', Consolas, Menlo, Monaco, 'Courier New', monospace",
 }
 
 
@@ -46,6 +50,7 @@ class RenderOptions:
     show_bit_widths: bool = True  # ":12" suffix on bitfield labels
     theme: dict = field(default_factory=dict)
     transparent: bool = False     # skip background rect
+    responsive: bool = False      # fluid width (100% up to natural size)
     corner_radius: int = 4
     margin: int = 24
 
@@ -61,6 +66,8 @@ class Segment:
     is_padding: bool = False
     is_bitfield: bool = False
     is_flex: bool = False
+    is_extra: bool = False       # hand-annotated companion allocation
+    extra_kind: str = "embedded"  # embedded (same alloc) | separate (own alloc)
 
     @property
     def bytes_str(self) -> str:
@@ -86,6 +93,16 @@ def segments_from_layout(sl: StructLayout, opts: RenderOptions) -> list[Segment]
             segs.append(Segment("pad" if f.is_padding else name,
                                 f.offset * 8, f.size * 8,
                                 is_padding=f.is_padding))
+    # hand-annotated companion allocations (from layout JSON)
+    cursor = max([sl.size * 8] + [g.start_bits + g.width_bits for g in segs])
+    for extra in sl.extras:
+        kind = extra.get("kind", "embedded")
+        width_bits = int(extra["bytes"]) * 8
+        if kind == "separate":
+            cursor += SEP_GAP_BITS  # visual gap; '+' drawn in the gap
+        segs.append(Segment(extra["label"], cursor, width_bits,
+                            is_extra=True, extra_kind=kind))
+        cursor += width_bits
     return segs
 
 
@@ -177,6 +194,8 @@ def _style_block(theme: dict) -> str:
   .fd-field   {{ fill: var(--fd-field, {t['field']}); stroke: var(--fd-border, {t['border']}); stroke-width: 1; }}
   .fd-pad     {{ fill: url(#fd-hatch); stroke: var(--fd-pad-stroke, {t['pad-stroke']}); stroke-width: 1; }}
   .fd-flex    {{ fill: none; stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; stroke-dasharray: 4 3; }}
+  .fd-extra   {{ fill: var(--fd-field, {t['field']}); fill-opacity: 0.55; stroke: var(--fd-border, {t['border']}); stroke-width: 1; stroke-dasharray: 5 3; }}
+  .fd-plus    {{ fill: var(--fd-muted, {t['muted']}); }}
   .fd-label   {{ fill: var(--fd-field-text, {t['field-text']}); }}
   .fd-padlbl  {{ fill: var(--fd-muted, {t['muted']}); }}
   .fd-callout {{ fill: var(--fd-text, {t['text']}); }}
@@ -206,14 +225,15 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
     ppb = opts.px_per_byte
     m = opts.margin
     x0 = m
-    end_bits = max([sl.size * 8] + [g.start_bits + g.width_bits for g in segments_from_layout(sl, opts)])
-    total_px = end_bits / 8 * ppb
     segs = segments_from_layout(sl, opts)
+    end_bits = max([sl.size * 8] + [g.start_bits + g.width_bits for g in segs])
+    total_px = end_bits / 8 * ppb
 
     inline, callouts, runs = plan_labels(segs, opts, x0)
 
     # vertical budget
-    title = opts.title if opts.title is not None else f"struct {sl.name}"
+    title = opts.title if opts.title is not None else \
+        (sl.title or f"struct {sl.name}")
     cy = m + 4
     parts: list[str] = []
     if title:
@@ -231,14 +251,25 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
     for seg in segs:
         x = x0 + seg.start_bits / 8 * ppb
         w = seg.width_bits / 8 * ppb
-        cls = "fd-pad" if seg.is_padding else ("fd-flex" if seg.is_flex else "fd-field")
+        if seg.is_padding:
+            cls = "fd-pad"
+        elif seg.is_flex:
+            cls = "fd-flex"
+        elif seg.is_extra:
+            cls = "fd-extra"
+            if seg.extra_kind == "separate":
+                gap_px = SEP_GAP_BITS / 8 * ppb
+                parts.append(_text(x - gap_px / 2, bar_top + opts.bar_height / 2 + 5,
+                                   "+", 17, "fd-plus", weight="700"))
+        else:
+            cls = "fd-field"
         parts.append(f'<rect class="{cls}" x="{x:.1f}" y="{bar_top:.1f}" '
                      f'width="{w:.1f}" height="{opts.bar_height}" rx="{opts.corner_radius}"/>')
     for seg, txt in inline:
         if not txt:
             continue
         x = x0 + (seg.start_bits + seg.width_bits / 2) / 8 * ppb
-        cls = "fd-padlbl" if seg.is_padding else "fd-label"
+        cls = "fd-padlbl" if seg.is_padding else ("fd-callout" if seg.is_extra else "fd-label")
         parts.append(_text(x, bar_top + opts.bar_height / 2 + 5, txt,
                            opts.font_size, cls, weight="700"))
 
@@ -280,11 +311,26 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
         parts.append(_text(x0, cy, f"\u25bc {pad_b} of {sl.size} bytes are padding ({pct}%)",
                            13, "fd-accent", "start", "700"))
 
-    width = int(2 * m + total_px)
+    # hand-annotated note (savings line etc.)
+    if sl.note:
+        cy += 18
+        parts.append(_text(x0, cy, f"\u25bc {sl.note}", 13, "fd-accent", "start", "700"))
+
+    # canvas must fit callout labels and title, not just the bar
+    content_right = x0 + total_px
+    for c in callouts:
+        content_right = max(content_right, c.label_x + c.width / 2)
+    if title:
+        content_right = max(content_right, x0 + _text_w(title, 15))
+    width = int(content_right + m)
     height = int(cy + m / 2)
     bg = "" if opts.transparent else f'<rect class="fd-bg" width="100%" height="100%" rx="8"/>\n'
+    if opts.responsive:
+        dims = f'style="width:100%;max-width:{width}px;height:auto"'
+    else:
+        dims = f'width="{width}" height="{height}"'
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" '
-            f'width="{width}" height="{height}">\n{_style_block(opts.theme)}\n'
+            f'{dims}>\n{_style_block(opts.theme)}\n'
             f'{bg}{HATCH}\n' + "\n".join(parts) + "\n</svg>")
 
 

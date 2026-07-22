@@ -160,3 +160,48 @@ class TestOptions:
     def test_no_padding_no_callout(self):
         svg = render("struct s { long a; long b; };")
         assert "padding" not in svg.split("</style>")[1]
+
+
+class TestAnnotations:
+    def _layout(self, **kw):
+        from fieldday.probe import StructLayout, FieldLayout
+        sl = StructLayout(name="t", size=8, align=8, **kw)
+        sl.fields.append(FieldLayout(name="a", type_str="long", offset=0, size=8))
+        return sl
+
+    def test_embedded_extra_renders_dashed(self):
+        sl = self._layout(extras=[{"label": "elem (16B)", "bytes": 16, "kind": "embedded"}])
+        svg = render_struct(sl, RenderOptions())
+        assert 'class="fd-extra"' in svg and "elem (16B)" in svg
+
+    def test_separate_extra_has_plus(self):
+        sl = self._layout(extras=[{"label": "sds", "bytes": 16, "kind": "separate"}])
+        svg = render_struct(sl, RenderOptions())
+        assert 'class="fd-plus"' in svg
+
+    def test_note_rendered_in_accent(self):
+        sl = self._layout(note="51 bytes total")
+        svg = render_struct(sl, RenderOptions())
+        assert "51 bytes total" in svg
+
+    def test_struct_title_used(self):
+        sl = self._layout(title="My hand-written title")
+        svg = render_struct(sl, RenderOptions())
+        assert "My hand-written title" in svg
+
+    def test_opts_title_overrides_struct_title(self):
+        sl = self._layout(title="from json")
+        svg = render_struct(sl, RenderOptions(title="from cli"))
+        assert "from cli" in svg and "from json" not in svg
+
+    def test_responsive_dims(self):
+        sl = self._layout()
+        svg = render_struct(sl, RenderOptions(responsive=True))
+        assert "width:100%;max-width:" in svg and 'height="' not in svg.split(">")[0].replace("viewBox", "")
+
+    def test_ruler_spans_struct_only(self):
+        # extras must not extend the byte ruler
+        sl = self._layout(extras=[{"label": "e", "bytes": 100, "kind": "embedded"}])
+        svg = render_struct(sl, RenderOptions())
+        rlbls = re.findall(r'class="fd-rlbl"[^>]*>(\d+)<', svg)
+        assert max(int(x) for x in rlbls) == 8

@@ -45,6 +45,11 @@ class StructLayout:
     size: int
     align: int
     fields: list[FieldLayout] = field(default_factory=list)
+    # hand-annotation extensions (populated via layout JSON, not the probe):
+    # extras: companion allocations [{label, bytes, kind: embedded|separate}]
+    extras: list = field(default_factory=list)
+    note: str | None = None   # savings/summary line rendered in accent color
+    title: str | None = None  # hand-written diagram title
 
     @property
     def padding_bytes(self) -> int:
@@ -207,6 +212,9 @@ def layouts_to_json(layouts: list[StructLayout]) -> str:
     return json.dumps(
         {"structs": [
             {"name": s.name, "size": s.size, "align": s.align,
-             "fields": [enc(f) for f in s.fields]}
+             "fields": [enc(f) for f in s.fields],
+             **({"extras": s.extras} if s.extras else {}),
+             **({"note": s.note} if s.note else {}),
+             **({"title": s.title} if s.title else {})}
             for s in layouts]},
         indent=2)
