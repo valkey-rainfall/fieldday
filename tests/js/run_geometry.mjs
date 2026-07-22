@@ -140,8 +140,28 @@ check("theme_override_baked", () => {
 check("css_variables_present", () => {
   assert(render("struct s { long a; };").includes("var(--fd-field,"), "css vars missing");
 });
-check("padding_callout", () => {
-  assert(render("struct s { char c; long l; };").includes("bytes are padding"), "missing callout");
+check("padding_callout_opt_in", () => {
+  assert(!render("struct s { char c; long l; };").includes("bytes are padding"), "callout not opt-in");
+  assert(render("struct s { char c; long l; };", { paddingCallout: true })
+    .includes("bytes are padding"), "opt-in callout missing");
+});
+check("cache_line_ticks", () => {
+  const svg = render("struct s { char big[130]; };", { pxPerByte: 4 });
+  const n = (svg.split("</style>")[1].match(/class="fd-cline"/g) || []).length;
+  assert(n === 2, `expected 2 cache-line ticks, got ${n}`);
+});
+check("embedded_after_separate_joins_that_allocation", () => {
+  const sl = computeLayouts("struct s { long a; };")[0];
+  sl.extras = [
+    { label: "e1", bytes: 5, kind: "embedded" },
+    { label: "s1", bytes: 5, kind: "separate" },
+    { label: "e2", bytes: 7, kind: "embedded" },
+  ];
+  const svg = renderStruct(sl);
+  const labels = [...svg.matchAll(/class="fd-rlbl"[^>]*>(\d+)</g)].map((m) => parseInt(m[1], 10));
+  assert(Math.max(...labels) === 13, `expected max 13, got ${Math.max(...labels)}`);
+  assert(labels.includes(12), "separate allocation should end at 12");
+  assert(labels.filter((x) => x === 0).length === 2, "expected two 0-origin rulers");
 });
 check("responsive_dims", () => {
   const svg = render("struct s { long a; };", { responsive: true });

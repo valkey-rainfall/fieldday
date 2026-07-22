@@ -153,13 +153,21 @@ class TestOptions:
         svg = render("struct s { long a; };")
         assert "var(--fd-field," in svg
 
-    def test_padding_callout_present(self):
-        svg = render("struct s { char c; long l; };")
+    def test_padding_callout_opt_in(self):
+        assert "bytes are padding" not in render("struct s { char c; long l; };")
+        svg = render("struct s { char c; long l; };", padding_callout=True)
         assert "bytes are padding" in svg
 
     def test_no_padding_no_callout(self):
-        svg = render("struct s { long a; long b; };")
+        svg = render("struct s { long a; long b; };", padding_callout=True)
         assert "padding" not in svg.split("</style>")[1]
+
+    def test_cache_line_ticks(self):
+        svg = render("struct s { char big[130]; };", px_per_byte=4)
+        assert svg.count('class="fd-cline"') == 2  # ticks at 64 and 128
+        assert 'class="fd-clbl"' in svg
+        svg0 = render("struct s { char big[130]; };", px_per_byte=4, cache_line=0)
+        assert 'fd-cline' not in svg0.split("</style>")[1]
 
 
 class TestAnnotations:
@@ -235,3 +243,18 @@ class TestAnnotations:
         svg = render_struct(sl, RenderOptions())
         assert "cool label" in svg and "flags!" in svg
         assert ">b<" not in svg and ">f:4<" not in svg
+
+    def test_embedded_after_separate_joins_that_allocation(self):
+        # embedded | separate | embedded: the trailing embedded item belongs
+        # to the separate allocation's ruler; rulers must not overlap
+        sl = self._layout(extras=[
+            {"label": "e1", "bytes": 5, "kind": "embedded"},
+            {"label": "s1", "bytes": 5, "kind": "separate"},
+            {"label": "e2", "bytes": 7, "kind": "embedded"},
+        ])
+        svg = render_struct(sl, RenderOptions())
+        rlbls = [int(x) for x in re.findall(r'class="fd-rlbl"[^>]*>(\d+)<', svg)]
+        # alloc 0: struct 8B + e1 5B = 13; alloc 1: s1 5B + e2 7B = 12
+        assert max(rlbls) == 13
+        assert 12 in rlbls
+        assert rlbls.count(0) == 2

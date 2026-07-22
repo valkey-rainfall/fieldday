@@ -45,7 +45,8 @@ class RenderOptions:
     callout_font_size: int = 12
     ruler: bool = True           # byte ruler below the bar
     ruler_step: int = 8
-    padding_callout: bool = True  # "N of M bytes are padding" line
+    cache_line: int = 64          # heavy tick every N bytes (0 disables)
+    padding_callout: bool = False  # opt-in "N of M bytes are padding" line
     title: str | None = None      # None = struct name
     show_bit_widths: bool = True  # ":12" suffix on bitfield labels
     theme: dict = field(default_factory=dict)
@@ -231,6 +232,8 @@ def _style_block(theme: dict, extra_css: str = "") -> str:
   .fd-callout {{ fill: var(--fd-text, {t['text']}); }}
   .fd-leader  {{ stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; fill: none; }}
   .fd-ruler   {{ stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; }}
+  .fd-cline   {{ stroke: var(--fd-accent, {t['accent']}); stroke-width: 2.5; }}
+  .fd-clbl    {{ fill: var(--fd-accent, {t['accent']}); }}
   .fd-rlbl    {{ fill: var(--fd-muted, {t['muted']}); }}
   .fd-accent  {{ fill: var(--fd-accent, {t['accent']}); }}
   text        {{ font-family: var(--fd-font, {t['font']}); }}
@@ -333,24 +336,43 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
             rx2 = x0 + end_bits / 8 * ppb
             n_bytes = (end_bits - start_bits) // 8
             parts.append(f'<line class="fd-ruler" x1="{rx1:.1f}" y1="{ry}" x2="{rx2:.1f}" y2="{ry}"/>')
+
+            def tick(b, cls, tlen, lblcls, weight):
+                x = rx1 + b * ppb
+                parts.append(f'<line class="{cls}" x1="{x:.1f}" y1="{ry}" x2="{x:.1f}" y2="{ry + tlen}"/>')
+                parts.append(_text(x, ry + 20, str(label_base + b), 11, lblcls,
+                                   weight=weight))
+
+            cl = opts.cache_line
             b = 0
             while b <= n_bytes:
-                x = rx1 + b * ppb
-                parts.append(f'<line class="fd-ruler" x1="{x:.1f}" y1="{ry}" x2="{x:.1f}" y2="{ry + 6}"/>')
-                parts.append(_text(x, ry + 20, str(label_base + b), 11, "fd-rlbl"))
+                if not (cl and b and b % cl == 0):
+                    tick(b, "fd-ruler", 6, "fd-rlbl", "600")
                 b += opts.ruler_step
-            if n_bytes % opts.ruler_step != 0:
-                x = rx1 + n_bytes * ppb
-                parts.append(f'<line class="fd-ruler" x1="{x:.1f}" y1="{ry}" x2="{x:.1f}" y2="{ry + 6}"/>')
-                parts.append(_text(x, ry + 20, str(label_base + n_bytes), 11, "fd-rlbl"))
+            if n_bytes % opts.ruler_step != 0 and not (cl and n_bytes % cl == 0):
+                tick(n_bytes, "fd-ruler", 6, "fd-rlbl", "600")
+            # cache-line boundaries: emphasized ticks drawn last (on top)
+            if cl:
+                b = cl
+                while b <= n_bytes:
+                    tick(b, "fd-cline", 9, "fd-clbl", "700")
+                    b += cl
 
-        main_end = max([sl.size * 8] +
-                       [g.start_bits + g.width_bits for g in segs
-                        if not (g.is_extra and g.extra_kind == "separate")])
-        draw_ruler(0, main_end, 0)
+        # group segments into allocations: the struct plus its embedded
+        # extras form allocation 0; each separate extra starts a new
+        # allocation that includes any embedded extras following it
+        allocs = []
+        cur_start, cur_end = 0, sl.size * 8
         for g in segs:
             if g.is_extra and g.extra_kind == "separate":
-                draw_ruler(g.start_bits, g.start_bits + g.width_bits, 0)
+                allocs.append((cur_start, cur_end))
+                cur_start = g.start_bits
+                cur_end = g.start_bits + g.width_bits
+            else:
+                cur_end = max(cur_end, g.start_bits + g.width_bits)
+        allocs.append((cur_start, cur_end))
+        for a_start, a_end in allocs:
+            draw_ruler(a_start, a_end, 0)
         cy = ry + 26
 
     # padding callout

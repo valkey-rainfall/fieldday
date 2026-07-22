@@ -53,6 +53,29 @@ struct entry {
     uint32_t hash;
     struct entry *next;
 };`,
+  "extras: embedded + separate": `/* companion allocations via the Annotations panel:
+   embedded items continue an allocation (and its ruler);
+   a separate item starts its own allocation and ruler */
+struct node {
+    double score;
+    struct node *next;
+    uint32_t hash;
+};`,
+};
+
+const EXAMPLE_ANNOTATIONS = {
+  "extras: embedded + separate": {
+    node: {
+      title: "node + out-of-line element (2 allocations)",
+      note: "24B node + 20B element = 44 bytes in 2 allocations",
+      extras: [
+        "inline tag | 4 | embedded",
+        "element sds hdr | 4 | separate",
+        "element bytes (16B) | 16 | embedded",
+      ].join("\n"),
+      relabel: "",
+    },
+  },
 };
 
 function themeCssTemplate(themeName) {
@@ -74,6 +97,27 @@ function syncCssBox() {
 
 let layouts = [];          // last successful computeLayouts result
 let currentSvgs = [];      // [{name, svg}] from last render
+let annStore = {};         // struct name -> {title, note, extras, relabel}
+let annCurrent = null;     // struct name currently shown in the fields
+
+function saveAnnFields() {
+  if (annCurrent === null) return;
+  annStore[annCurrent] = {
+    title: $("title").value,
+    note: $("note").value,
+    extras: $("extras").value,
+    relabel: $("relabel").value,
+  };
+}
+
+function loadAnnFields(name) {
+  const a = annStore[name] || { title: "", note: "", extras: "", relabel: "" };
+  $("title").value = a.title;
+  $("note").value = a.note;
+  $("extras").value = a.extras;
+  $("relabel").value = a.relabel;
+  annCurrent = name;
+}
 
 function parseExtras(text) {
   const extras = [];
@@ -147,16 +191,15 @@ function options() {
   };
 }
 
-function annotate(sl, isSelected) {
-  // annotations apply to the selected struct only (single-struct: always)
-  if (!isSelected) return sl;
+function annotate(sl) {
+  // each struct carries its own annotations (annStore, keyed by name)
+  const a = annStore[sl.name];
+  if (!a) return sl;
   const copy = { ...sl };
-  const title = $("title").value.trim();
-  const note = $("note").value.trim();
-  if (title) copy.title = title;
-  if (note) copy.note = note;
-  copy.extras = parseExtras($("extras").value);
-  copy.relabel = parseRelabel($("relabel").value);
+  if (a.title && a.title.trim()) copy.title = a.title.trim();
+  if (a.note && a.note.trim()) copy.note = a.note.trim();
+  copy.extras = parseExtras(a.extras || "");
+  copy.relabel = parseRelabel(a.relabel || "");
   return copy;
 }
 
@@ -166,11 +209,12 @@ function rerender() {
   try {
     layouts = computeLayouts($("snippet").value);
     updateStructPicker();
-    const sel = selectedStructIndex();
+    const curName = layouts[selectedStructIndex()]?.name;
+    if (curName !== annCurrent) loadAnnFields(curName);
     const opts = options();
-    currentSvgs = layouts.map((sl, i) => ({
+    currentSvgs = layouts.map((sl) => ({
       name: sl.name,
-      svg: renderStruct(annotate(sl, i === sel), opts),
+      svg: renderStruct(annotate(sl), opts),
     }));
     preview.innerHTML = currentSvgs.map((s) => s.svg).join("\n");
     err.hidden = true;
@@ -191,8 +235,7 @@ function download(name, mime, content) {
 }
 
 function layoutJson() {
-  const sel = selectedStructIndex();
-  const structs = layouts.map((sl, i) => annotate(sl, i === sel));
+  const structs = layouts.map((sl) => annotate(sl));
   return JSON.stringify({ structs }, null, 2) + "\n";
 }
 
@@ -206,6 +249,8 @@ for (const [name, code] of Object.entries(EXAMPLES)) {
   b.textContent = name;
   b.addEventListener("click", () => {
     $("snippet").value = code;
+    annStore = { ...(EXAMPLE_ANNOTATIONS[name] || {}) };
+    annCurrent = null;
     rerender();
   });
   exWrap.appendChild(b);
@@ -218,15 +263,20 @@ function scheduleRender() {
 }
 
 $("snippet").addEventListener("input", scheduleRender);
-$("extras").addEventListener("input", scheduleRender);
 $("customcss").addEventListener("input", scheduleRender);
-$("relabel").addEventListener("input", scheduleRender);
 $("theme").addEventListener("change", () => { syncCssBox(); rerender(); });
 for (const id of ["theme", "ppb", "ruler", "padcallout", "transparent",
-                  "responsive", "title", "note", "structpick"]) {
+                  "responsive"]) {
   $(id).addEventListener("change", rerender);
   $(id).addEventListener("input", scheduleRender);
 }
+for (const id of ["title", "note", "extras", "relabel"]) {
+  $(id).addEventListener("input", () => { saveAnnFields(); scheduleRender(); });
+}
+$("structpick").addEventListener("change", () => {
+  loadAnnFields(layouts[selectedStructIndex()]?.name ?? null);
+  rerender();
+});
 
 $("dl-svg").addEventListener("click", () => {
   if (!currentSvgs.length) return;
