@@ -73,11 +73,25 @@ try {
   }
 
   // 4. error panel behaves: unknown type shows actionable message
-  await page.fill("#snippet", "struct p { wat w; };");
+  await page.evaluate(() => window.fieldday.setSnippet("struct p { wat w; };"));
   await page.waitForFunction(
     () => !document.getElementById("error").hidden, null, { timeout: 5000 });
   const errText = await page.$eval("#error", (el) => el.textContent);
   if (!errText.includes("stub wat")) failures.push("error panel missing stub hint: " + errText);
+
+  // 5. JSON mode: editing the layout JSON directly drives the render
+  const jsonModeOk = await page.evaluate(() => {
+    window.fieldday.setSnippet("struct p { long a; };");
+    window.fieldday.setMode("json");
+    window.fieldday.setJson(JSON.stringify({ structs: [{
+      name: "handmade", size: 16, align: 8,
+      title: "from the JSON pane",
+      fields: [{ name: "x", offset: 0, size: 8 }, { name: "y", offset: 8, size: 8 }],
+    }] }));
+    const svg = document.getElementById("preview").innerHTML;
+    return window.fieldday.getMode() === "json" && svg.includes("from the JSON pane");
+  });
+  if (!jsonModeOk) failures.push("JSON mode did not render hand-edited layout");
 } finally {
   await browser.close();
   server.close();
@@ -87,4 +101,4 @@ if (failures.length) {
   for (const f of failures) console.error("FAIL " + f);
   process.exit(1);
 }
-console.log("e2e: 4 checks passed (boot, render, python parity in browser, error panel)");
+console.log("e2e: 5 checks passed (boot, render, python parity, error panel, json mode)");

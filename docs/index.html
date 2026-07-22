@@ -17,9 +17,15 @@
 
 <main>
   <section class="pane pane-input">
-    <label for="snippet"><h2>C snippet</h2></label>
-    <textarea id="snippet" spellcheck="false" rows="16"></textarea>
+    <h2>C snippet</h2>
+    <div id="snippet-editor" class="editor-pane"></div>
     <div id="error" class="error" hidden></div>
+
+    <details open>
+      <summary>Layout JSON <span class="hint" id="json-status">read-only view of the generated layout — click to edit</span></summary>
+      <div id="json-editor" class="editor-pane editor-pane-json"></div>
+      <div class="controls"><button type="button" id="mode-toggle" class="secondary">Edit JSON directly</button></div>
+    </details>
 
     <details open>
       <summary>Options</summary>
@@ -42,7 +48,7 @@
 
     <details>
       <summary>Annotations <span class="hint">(per struct &mdash; use the Struct picker to switch)</span></summary>
-      <div class="controls controls-col">
+      <fieldset id="annotations-fieldset" class="controls controls-col">
         <label>Title override
           <input type="text" id="title" placeholder="e.g. Valkey 9.1: element embedded in the node">
         </label>
@@ -61,7 +67,7 @@
           <textarea id="relabel" rows="3" spellcheck="false"
             placeholder="val_ptr | *ptr (optional)&#10;lru |"></textarea>
         </label>
-      </div>
+      </fieldset>
     </details>
 
     <details>

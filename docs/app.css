@@ -153,3 +153,13 @@ button.secondary:hover { background: var(--vk-surface); }
 #customcss { width: 100%; font-family: "Fira Mono", monospace; font-size: 13px; border: 1px solid var(--vk-border); border-radius: 6px; padding: 10px; background: var(--vk-surface); resize: vertical; }
 #relabel { width: 100%; font-family: "Fira Mono", monospace; font-size: 13px; border: 1px solid var(--vk-border); border-radius: 6px; padding: 10px; background: var(--vk-surface); resize: vertical; }
 #arrows { width: 100%; font-family: "Fira Mono", monospace; font-size: 13px; border: 1px solid var(--vk-border); border-radius: 6px; padding: 10px; background: var(--vk-surface); resize: vertical; }
+
+.editor-pane { border: 1px solid var(--vk-border); border-radius: 6px; background: var(--vk-surface); overflow: hidden; }
+.editor-pane .cm-editor { max-height: 340px; font-size: 13px; }
+.editor-pane .cm-scroller { font-family: "Fira Mono", Consolas, Menlo, monospace; line-height: 1.45; }
+.editor-pane-json { margin-top: 8px; }
+.editor-pane-json .cm-editor { max-height: 260px; }
+.cm-editor.editor-readonly { opacity: 0.62; }
+.cm-editor.cm-focused { outline: 2px solid var(--vk-blue); }
+fieldset#annotations-fieldset { border: 0; padding: 0; margin: 0; }
+fieldset#annotations-fieldset:disabled { opacity: 0.5; }

@@ -5,9 +5,14 @@
   "description": "Browser build of fieldday (docs/) with golden-vector cross-validation tests",
   "scripts": {
     "test": "node tests/js/run_vectors.mjs && node tests/js/run_geometry.mjs",
-    "test:parity": "tests/js/run_parity.sh"
+    "test:parity": "tests/js/run_parity.sh",
+    "build:editor": "esbuild tools/editor_bundle_entry.js --bundle --format=esm --minify --outfile=docs/vendor/codemirror.js"
   },
   "devDependencies": {
+    "@codemirror/lang-cpp": "6.0.2",
+    "@codemirror/lang-json": "6.0.1",
+    "codemirror": "6.0.1",
+    "esbuild": "0.24.2",
     "playwright-core": "1.49.1"
   }
 }
