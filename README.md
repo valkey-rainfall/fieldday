@@ -152,6 +152,14 @@ omits the background so the page shows through. Elements carry readable
 classes (`fd-field-box`, `fd-padding-label`, `fd-cache-line`, ...) for
 targeted styling via `--css` / the web Custom CSS panel.
 
+## Examples and gallery
+
+`examples/` holds small feature-demo snippets. `gallery/` holds the
+annotated layout JSONs behind published diagrams, one directory per
+deliverable — these are the sources; rendered SVGs are build artifacts
+that live at their destination, not in this repo. Some gallery files
+double as CI fixtures for the renderer parity check.
+
 ## Development
 
 ```
