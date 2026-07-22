@@ -227,6 +227,7 @@ function styleBlock(theme, extraCss = "") {
   .fd-pointer-head   { fill: var(--fd-text, ${t["text"]}); }
   .fd-ruler-label    { fill: var(--fd-muted, ${t["muted"]}); }
   .fd-note  { fill: var(--fd-highlight, ${t["highlight"]}); }
+  .fd-note-plain { fill: var(--fd-text, ${t["text"]}); }
   text        { font-family: var(--fd-font, ${t["font"]}); }
   .fd-hatch-background { fill: var(--fd-padding-fill, ${t["padding-fill"]}); }
   .fd-hatch-lines { stroke: var(--fd-padding-stroke, ${t["padding-stroke"]}); stroke-width: 1.5; }
@@ -439,10 +440,15 @@ export function renderStruct(sl, userOpts = {}) {
                       13, "fd-note", "start", "700"));
   }
 
-  // hand-annotated note
+  // hand-annotated note: neutral by default; the savings style opts into
+  // the green decrease glyph (only right when the note describes a saving)
   if (sl.note) {
     cy += 18;
-    parts.push(textEl(x0, cy, `\u25bc ${sl.note}`, 13, "fd-note", "start", "700"));
+    if (sl.note_style === "savings") {
+      parts.push(textEl(x0, cy, `\u25bc ${sl.note}`, 13, "fd-note", "start", "700"));
+    } else {
+      parts.push(textEl(x0, cy, sl.note, 13, "fd-note-plain", "start", "600"));
+    }
   }
 
   // canvas must fit callout labels and title, not just the bar

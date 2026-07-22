@@ -238,6 +238,7 @@ def _style_block(theme: dict, extra_css: str = "") -> str:
   .fd-pointer-head   {{ fill: var(--fd-text, {t['text']}); }}
   .fd-ruler-label    {{ fill: var(--fd-muted, {t['muted']}); }}
   .fd-note  {{ fill: var(--fd-highlight, {t['highlight']}); }}
+  .fd-note-plain {{ fill: var(--fd-text, {t['text']}); }}
   text        {{ font-family: var(--fd-font, {t['font']}); }}
   .fd-hatch-background {{ fill: var(--fd-padding-fill, {t['padding-fill']}); }}
   .fd-hatch-lines {{ stroke: var(--fd-padding-stroke, {t['padding-stroke']}); stroke-width: 1.5; }}
@@ -439,10 +440,14 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
         parts.append(_text(x0, cy, f"\u25bc {pad_b} of {sl.size} bytes are padding ({pct}%)",
                            13, "fd-note", "start", "700"))
 
-    # hand-annotated note (savings line etc.)
+    # hand-annotated note: neutral by default; the savings style opts into
+    # the green decrease glyph (only right when the note describes a saving)
     if sl.note:
         cy += 18
-        parts.append(_text(x0, cy, f"\u25bc {sl.note}", 13, "fd-note", "start", "700"))
+        if getattr(sl, "note_style", "plain") == "savings":
+            parts.append(_text(x0, cy, f"\u25bc {sl.note}", 13, "fd-note", "start", "700"))
+        else:
+            parts.append(_text(x0, cy, sl.note, 13, "fd-note-plain", "start", "600"))
 
     # canvas must fit callout labels and title, not just the bar
     content_right = x0 + total_px
