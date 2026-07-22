@@ -256,6 +256,49 @@ function f1(x) {
   return (Object.is(out, -0) ? 0 : out).toFixed(1);
 }
 
+/** class -> inline presentation attributes. Non-browser rasterizers
+ * (macOS Preview, Slack thumbnails, some Inkscape paths) ignore <style>
+ * blocks; presentation attributes are core SVG 1.1 and always honored.
+ * Browsers still apply the <style> var() rules on top (CSS outranks
+ * presentation attributes), so page-level --fd-* theming is unaffected. */
+function presentationAttrs(theme) {
+  const t = { ...DEFAULT_THEME, ...theme };
+  const font = t["font"].replace(/"/g, "&quot;");
+  return {
+    "fd-background": `fill="${t["background"]}"`,
+    "fd-title": `fill="${t["text"]}" font-family="${font}"`,
+    "fd-field-box": `fill="${t["field-fill"]}" stroke="${t["field-border"]}" stroke-width="1"`,
+    "fd-padding-box": `fill="url(#fd-hatch)" stroke="${t["padding-stroke"]}" stroke-width="1"`,
+    "fd-flexible-array": `fill="none" stroke="${t["muted"]}" stroke-width="1" stroke-dasharray="4 3"`,
+    "fd-extra-box": `fill="${t["field-fill"]}" fill-opacity="0.55" stroke="${t["field-border"]}" stroke-width="1" stroke-dasharray="5 3"`,
+    "fd-slack-box": `fill="${t["muted"]}" fill-opacity="0.10" stroke="${t["muted"]}" stroke-width="1" stroke-dasharray="2 3"`,
+    "fd-allocation-plus": `fill="${t["muted"]}" font-family="${font}"`,
+    "fd-field-label": `fill="${t["field-text"]}" font-family="${font}"`,
+    "fd-padding-label": `fill="${t["muted"]}" font-family="${font}"`,
+    "fd-callout-label": `fill="${t["text"]}" font-family="${font}"`,
+    "fd-leader-line": `stroke="${t["muted"]}" stroke-width="1" fill="none"`,
+    "fd-ruler-line": `stroke="${t["muted"]}" stroke-width="1"`,
+    "fd-ruler-label": `fill="${t["muted"]}" font-family="${font}"`,
+    "fd-cache-line": `stroke="${t["text"]}" stroke-width="3" stroke-dasharray="7 4" opacity="0.8"`,
+    "fd-cache-line-label": `fill="${t["text"]}" font-family="${font}"`,
+    "fd-note": `fill="${t["highlight"]}" font-family="${font}"`,
+    "fd-note-plain": `fill="${t["text"]}" font-family="${font}"`,
+    "fd-subdivision-line": `stroke="${t["field-text"]}" stroke-width="1" stroke-dasharray="2 3" opacity="0.45"`,
+    "fd-pointer-arrow": `stroke="${t["text"]}" stroke-width="1.5" fill="none"`,
+    "fd-pointer-head": `fill="${t["text"]}"`,
+    "fd-hatch-background": `fill="${t["padding-fill"]}"`,
+    "fd-hatch-lines": `stroke="${t["padding-stroke"]}" stroke-width="1.5"`,
+  };
+}
+
+/** Inject presentation attributes next to every class= use. */
+function inlinePresentation(svg, theme) {
+  for (const [cls, attrs] of Object.entries(presentationAttrs(theme))) {
+    svg = svg.split(`class="${cls}"`).join(`class="${cls}" ${attrs}`);
+  }
+  return svg;
+}
+
 function styleBlock(theme, extraCss = "") {
   const t = { ...DEFAULT_THEME, ...theme };
   const tail = extraCss.trim() ? "\n" + extraCss.trim() : "";
@@ -522,6 +565,7 @@ export function renderStruct(sl, userOpts = {}) {
   const dims = opts.responsive
     ? `style="width:100%;max-width:${width}px;height:auto"`
     : `width="${width}" height="${height}"`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" ` +
+  const body = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" ` +
     `${dims}>\n${styleBlock(opts.theme, opts.extraCss)}\n${bg}${HATCH}\n` + parts.join("\n") + "\n</svg>";
+  return inlinePresentation(body, opts.theme);
 }
