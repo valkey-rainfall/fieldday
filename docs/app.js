@@ -221,6 +221,8 @@ function options() {
     paddingCallout: $("padcallout").checked,
     transparent: $("transparent").checked,
     responsive: $("responsive").checked,
+    cacheLine: $("cacheline").checked ? 64 : 0,
+    jemallocSlack: $("jemslack").checked,
     extraCss: $("customcss").value,
   };
 }
@@ -341,7 +343,7 @@ $("mode-toggle").addEventListener("click", () =>
   setMode(mode === "c" ? "json" : "c"));
 $("theme").addEventListener("change", () => { syncCssBox(); rerender(); });
 for (const id of ["theme", "ppb", "ruler", "padcallout", "transparent",
-                  "responsive"]) {
+                  "responsive", "cacheline", "jemslack"]) {
   $(id).addEventListener("change", rerender);
   $(id).addEventListener("input", scheduleRender);
 }

@@ -105,6 +105,9 @@ def main(argv=None) -> int:
     ap.add_argument("--no-ruler", action="store_true", help="omit byte ruler")
     ap.add_argument("--padding-callout", action="store_true",
                     help="add a 'N of M bytes are padding' line")
+    ap.add_argument("--jemalloc-slack", action="store_true",
+                    help="show jemalloc size-class round-up waste at the end "
+                         "of each allocation (illustrative: standard classes)")
     ap.add_argument("--cache-line", type=int, default=64, metavar="N",
                     help="emphasized ruler tick every N bytes (0 disables; default 64)")
     ap.add_argument("--px-per-byte", type=float, default=15.0,
@@ -144,6 +147,7 @@ def main(argv=None) -> int:
         ruler=not args.no_ruler,
         padding_callout=args.padding_callout,
         cache_line=args.cache_line,
+        jemalloc_slack=args.jemalloc_slack,
         px_per_byte=args.px_per_byte,
     )
 

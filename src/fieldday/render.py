@@ -18,6 +18,20 @@ from pathlib import Path
 from .probe import StructLayout, FieldLayout
 
 CHAR_W = 0.62  # monospace width/em estimate
+
+
+def jemalloc_size_class(n: int) -> int:
+    """Standard jemalloc small/large size class for an n-byte request
+    (64-bit, default config). Illustrative: builds can differ."""
+    if n <= 8:
+        return 8
+    if n <= 16:
+        return 16
+    if n <= 128:
+        return (n + 15) // 16 * 16
+    group = 1 << (n - 1).bit_length()
+    spacing = group // 8
+    return (n + spacing - 1) // spacing * spacing
 SEP_GAP_BITS = 16  # visual gap (2 'bytes') before a separate allocation bar
 
 # Default: light scheme matching the valkey.io blog (white bg, #002a3a
@@ -46,6 +60,7 @@ class RenderOptions:
     ruler: bool = True           # byte ruler below the bar
     ruler_step: int = 8
     cache_line: int = 64          # heavy tick every N bytes (0 disables)
+    jemalloc_slack: bool = False  # show size-class round-up waste per allocation
     padding_callout: bool = False  # opt-in "N of M bytes are padding" line
     title: str | None = None      # None = struct name
     show_bit_widths: bool = True  # ":12" suffix on bitfield labels
@@ -68,6 +83,7 @@ class Segment:
     is_padding: bool = False
     is_bitfield: bool = False
     is_flex: bool = False
+    is_slack: bool = False       # jemalloc size-class round-up waste
     is_extra: bool = False       # hand-annotated companion allocation
     extra_kind: str = "embedded"  # embedded (same alloc) | separate (own alloc)
     dividers_bits: tuple = ()     # light internal boundaries, relative bits
@@ -134,6 +150,40 @@ def segments_from_layout(sl: StructLayout, opts: RenderOptions) -> list[Segment]
                             is_extra=True, extra_kind=kind,
                             dividers_bits=tuple(d * 8 for d in extra.get("dividers", ()))))
         cursor += width_bits
+
+    # jemalloc round-up slack, appended at the end of each allocation.
+    # A flexible array member makes the real allocation size unknowable
+    # from the diagram, so slack is skipped for that case.
+    if opts.jemalloc_slack and not any(g.is_flex for g in segs):
+        # allocation bounds: struct + its embedded extras, then one per
+        # separate extra (including that extra's trailing embedded items)
+        bounds = []
+        cur = [0, sl.size * 8]
+        for g in segs:
+            if g.is_extra and g.extra_kind == "separate":
+                bounds.append(tuple(cur))
+                cur = [g.start_bits, g.start_bits + g.width_bits]
+            else:
+                cur[1] = max(cur[1], g.start_bits + g.width_bits)
+        bounds.append(tuple(cur))
+
+        # insert a slack box at each allocation's end, shifting later
+        # allocations right by the accumulated slack
+        cum_bits = 0
+        slack_boxes = []
+        for a_start, a_end in bounds:
+            for g in segs:
+                if a_start <= g.start_bits < max(a_end, a_start + 1):
+                    g.start_bits += cum_bits
+            used = (a_end - a_start) // 8
+            slack = jemalloc_size_class(used) - used
+            if slack:
+                slack_boxes.append(Segment(
+                    f"+{slack}B ({jemalloc_size_class(used)}B class)",
+                    a_end + cum_bits, slack * 8, is_slack=True))
+                cum_bits += slack * 8
+        segs.extend(slack_boxes)
+        segs.sort(key=lambda g: g.start_bits)
     return segs
 
 
@@ -227,6 +277,8 @@ def _style_block(theme: dict, extra_css: str = "") -> str:
   .fd-padding-box     {{ fill: url(#fd-hatch); stroke: var(--fd-padding-stroke, {t['padding-stroke']}); stroke-width: 1; }}
   .fd-flexible-array    {{ fill: none; stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; stroke-dasharray: 4 3; }}
   .fd-extra-box   {{ fill: var(--fd-field-fill, {t['field-fill']}); fill-opacity: 0.55; stroke: var(--fd-field-border, {t['field-border']}); stroke-width: 1; stroke-dasharray: 5 3; }}
+  .fd-slack-box   {{ fill: var(--fd-muted, {t['muted']}); fill-opacity: 0.10; stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; stroke-dasharray: 2 3; }}
+  .fd-slack-label {{ fill: var(--fd-muted, {t['muted']}); }}
   .fd-allocation-plus    {{ fill: var(--fd-muted, {t['muted']}); }}
   .fd-field-label   {{ fill: var(--fd-field-text, {t['field-text']}); }}
   .fd-padding-label  {{ fill: var(--fd-muted, {t['muted']}); }}
@@ -303,7 +355,9 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
     for seg in segs:
         x = x0 + seg.start_bits / 8 * ppb
         w = seg.width_bits / 8 * ppb
-        if seg.is_padding:
+        if seg.is_slack:
+            cls = "fd-slack-box"
+        elif seg.is_padding:
             cls = "fd-padding-box"
         elif seg.is_flex:
             cls = "fd-flexible-array"
@@ -338,7 +392,9 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
         if not txt:
             continue
         x = x0 + (seg.start_bits + seg.width_bits / 2) / 8 * ppb
-        cls = "fd-padding-label" if seg.is_padding else ("fd-callout-label" if seg.is_extra else "fd-field-label")
+        cls = ("fd-slack-label" if seg.is_slack else
+               "fd-padding-label" if seg.is_padding else
+               "fd-callout-label" if seg.is_extra else "fd-field-label")
         parts.append(_text(x, bar_top + opts.bar_height / 2 + 5, txt,
                            opts.font_size, cls, weight="700"))
 

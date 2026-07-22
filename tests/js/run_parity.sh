@@ -16,6 +16,8 @@ for (const f of ['robj_90', 'robj_91']) {
 }
 const pair594 = JSON.parse(readFileSync('gallery/valkey-9.1-memory-blog/embstr_pair.json', 'utf8'));
 pair594.structs.forEach((s, i) => writeFileSync('$TMP/js_e594_' + i + '.svg', renderStruct(s, { pxPerByte: 14 })));
+const slackFix = JSON.parse(readFileSync('tests/fixtures/slack_demo.json', 'utf8'));
+writeFileSync('$TMP/js_slack.svg', renderStruct(slackFix.structs[0], { pxPerByte: 12, jemallocSlack: true }));
 const pair = JSON.parse(readFileSync('gallery/valkey-9.1-drafts/zslnode_pair.json', 'utf8'));
 pair.structs.forEach((s, i) => writeFileSync('$TMP/js_zsl' + i + '.svg', renderStruct(s, { pxPerByte: 10 })));
 "
@@ -32,10 +34,12 @@ for i, sl in enumerate(layouts_from_json(open("gallery/valkey-9.1-drafts/zslnode
     open(f"$TMP/py_zsl{i}.svg", "w").write(render_struct(sl, RenderOptions(px_per_byte=10)))
 for i, sl in enumerate(layouts_from_json(open("gallery/valkey-9.1-memory-blog/embstr_pair.json").read())):
     open(f"$TMP/py_e594_{i}.svg", "w").write(render_struct(sl, RenderOptions(px_per_byte=14)))
+sl = layouts_from_json(open("tests/fixtures/slack_demo.json").read())[0]
+open("$TMP/py_slack.svg", "w").write(render_struct(sl, RenderOptions(px_per_byte=12, jemalloc_slack=True)))
 EOF
 
 fail=0
-for p in robj_90 robj_91 zsl0 zsl1 e594_0 e594_1; do
+for p in robj_90 robj_91 zsl0 zsl1 e594_0 e594_1 slack; do
   if cmp -s "$TMP/py_$p.svg" "$TMP/js_$p.svg"; then
     echo "parity $p: identical"
   else

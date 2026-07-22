@@ -1,0 +1,20 @@
+{
+  "structs": [
+    {
+      "name": "slackdemo",
+      "size": 40,
+      "align": 8,
+      "title": "jemalloc slack parity fixture",
+      "fields": [
+        {"name": "a", "offset": 0, "size": 8},
+        {"name": "b", "offset": 8, "size": 8},
+        {"name": "c", "offset": 16, "size": 8},
+        {"name": "d", "offset": 24, "size": 8},
+        {"name": "e", "offset": 32, "size": 8}
+      ],
+      "extras": [
+        {"label": "element sds (20B)", "bytes": 20, "kind": "separate"}
+      ]
+    }
+  ]
+}

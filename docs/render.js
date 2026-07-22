@@ -9,6 +9,17 @@
  */
 
 export const CHAR_W = 0.62; // monospace width/em estimate
+
+/** Standard jemalloc small/large size class for an n-byte request
+ *  (64-bit, default config). Illustrative: builds can differ. */
+export function jemallocSizeClass(n) {
+  if (n <= 8) return 8;
+  if (n <= 16) return 16;
+  if (n <= 128) return Math.ceil(n / 16) * 16;
+  const group = 1 << (32 - Math.clz32(n - 1));
+  const spacing = group / 8;
+  return Math.ceil(n / spacing) * spacing;
+}
 const SEP_GAP_BITS = 16;    // visual gap (2 'bytes') before a separate allocation bar
 
 // Default: light scheme matching the valkey.io blog.
@@ -46,6 +57,7 @@ export function defaultOptions() {
     ruler: true,           // byte ruler below the bar
     rulerStep: 8,
     cacheLine: 64,         // heavy tick every N bytes (0 disables)
+    jemallocSlack: false,  // show size-class round-up waste per allocation
     paddingCallout: false, // opt-in "N of M bytes are padding" line
     title: null,           // null = struct title or "struct NAME"
     showBitWidths: true,   // ":12" suffix on bitfield labels
@@ -121,6 +133,44 @@ function segmentsFromLayout(sl, opts) {
                 isExtra: true, extraKind: kind,
                 dividersBits: (extra.dividers || []).map((d) => d * 8) });
     cursor += widthBits;
+  }
+
+  // jemalloc round-up slack, appended at the end of each allocation.
+  // A flexible array member makes the real allocation size unknowable
+  // from the diagram, so slack is skipped for that case.
+  if (opts.jemallocSlack && !segs.some((g) => g.isFlex)) {
+    const bounds = [];
+    let cur = [0, sl.size * 8];
+    for (const g of segs) {
+      if (g.isExtra && g.extraKind === "separate") {
+        bounds.push(cur);
+        cur = [g.startBits, g.startBits + g.widthBits];
+      } else {
+        cur[1] = Math.max(cur[1], g.startBits + g.widthBits);
+      }
+    }
+    bounds.push(cur);
+
+    let cumBits = 0;
+    const slackBoxes = [];
+    for (const [aStart, aEnd] of bounds) {
+      for (const g of segs) {
+        if (aStart <= g.startBits && g.startBits < Math.max(aEnd, aStart + 1)) {
+          g.startBits += cumBits;
+        }
+      }
+      const used = Math.trunc((aEnd - aStart) / 8);
+      const klass = jemallocSizeClass(used);
+      const slack = klass - used;
+      if (slack) {
+        slackBoxes.push({ label: `+${slack}B (${klass}B class)`,
+                          startBits: aEnd + cumBits, widthBits: slack * 8,
+                          isSlack: true });
+        cumBits += slack * 8;
+      }
+    }
+    segs.push(...slackBoxes);
+    segs.sort((a, b) => a.startBits - b.startBits);
   }
   return segs;
 }
@@ -216,6 +266,8 @@ function styleBlock(theme, extraCss = "") {
   .fd-padding-box     { fill: url(#fd-hatch); stroke: var(--fd-padding-stroke, ${t["padding-stroke"]}); stroke-width: 1; }
   .fd-flexible-array    { fill: none; stroke: var(--fd-muted, ${t["muted"]}); stroke-width: 1; stroke-dasharray: 4 3; }
   .fd-extra-box   { fill: var(--fd-field-fill, ${t["field-fill"]}); fill-opacity: 0.55; stroke: var(--fd-field-border, ${t["field-border"]}); stroke-width: 1; stroke-dasharray: 5 3; }
+  .fd-slack-box   { fill: var(--fd-muted, ${t["muted"]}); fill-opacity: 0.10; stroke: var(--fd-muted, ${t["muted"]}); stroke-width: 1; stroke-dasharray: 2 3; }
+  .fd-slack-label { fill: var(--fd-muted, ${t["muted"]}); }
   .fd-allocation-plus    { fill: var(--fd-muted, ${t["muted"]}); }
   .fd-field-label   { fill: var(--fd-field-text, ${t["field-text"]}); }
   .fd-padding-label  { fill: var(--fd-muted, ${t["muted"]}); }
@@ -301,7 +353,8 @@ export function renderStruct(sl, userOpts = {}) {
     const x = x0 + seg.startBits / 8 * ppb;
     const w = seg.widthBits / 8 * ppb;
     let cls;
-    if (seg.isPadding) cls = "fd-padding-box";
+    if (seg.isSlack) cls = "fd-slack-box";
+    else if (seg.isPadding) cls = "fd-padding-box";
     else if (seg.isFlex) cls = "fd-flexible-array";
     else if (seg.isExtra) {
       cls = "fd-extra-box";
@@ -336,7 +389,9 @@ export function renderStruct(sl, userOpts = {}) {
   for (const [seg, txt] of inline) {
     if (!txt) continue;
     const x = x0 + (seg.startBits + seg.widthBits / 2) / 8 * ppb;
-    const cls = seg.isPadding ? "fd-padding-label" : (seg.isExtra ? "fd-callout-label" : "fd-field-label");
+    const cls = seg.isSlack ? "fd-slack-label"
+      : seg.isPadding ? "fd-padding-label"
+      : seg.isExtra ? "fd-callout-label" : "fd-field-label";
     parts.push(textEl(x, barTop + opts.barHeight / 2 + 5, txt,
                       opts.fontSize, cls, "middle", "700"));
   }
