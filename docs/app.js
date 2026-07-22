@@ -2,6 +2,7 @@
 
 import { computeLayouts, LayoutError } from "./layout.js";
 import { renderStruct, THEMES, DEFAULT_THEME } from "./render.js";
+import { makeEditor } from "./editor.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -237,27 +238,65 @@ function annotate(sl) {
   return copy;
 }
 
+let mode = "c";  // source of truth: "c" (snippet) | "json" (layout JSON)
+
+function annotatedStructs() {
+  return layouts.map((sl) => annotate(sl));
+}
+
 function rerender() {
   const err = $("error");
   const preview = $("preview");
   try {
-    layouts = computeLayouts($("snippet").value);
-    updateStructPicker();
-    const curName = layouts[selectedStructIndex()]?.name;
-    if (curName !== annCurrent) loadAnnFields(curName);
+    let structs;
+    if (mode === "c") {
+      layouts = computeLayouts(cEditor.get());
+      updateStructPicker();
+      const curName = layouts[selectedStructIndex()]?.name;
+      if (curName !== annCurrent) loadAnnFields(curName);
+      structs = annotatedStructs();
+      // keep the JSON pane a live read-only view of the annotated layout
+      jsonEditor.set(JSON.stringify({ structs }, null, 2));
+    } else {
+      const data = JSON.parse(jsonEditor.get());
+      if (!data || !Array.isArray(data.structs)) {
+        throw new LayoutError("layout JSON must be an object with a 'structs' array");
+      }
+      structs = data.structs;
+      layouts = structs;
+      updateStructPicker();
+    }
     const opts = options();
-    currentSvgs = layouts.map((sl) => ({
+    currentSvgs = structs.map((sl) => ({
       name: sl.name,
-      svg: renderStruct(annotate(sl), opts),
+      svg: renderStruct(sl, opts),
     }));
     preview.innerHTML = currentSvgs.map((s) => s.svg).join("\n");
     err.hidden = true;
   } catch (e) {
-    if (!(e instanceof LayoutError)) console.error(e);
+    if (!(e instanceof LayoutError) && !(e instanceof SyntaxError)) console.error(e);
     err.textContent = e.message;
     err.hidden = false;
     // keep last good preview visible
   }
+}
+
+function setMode(m) {
+  if (m === mode) return;
+  if (m === "c" && jsonDirty &&
+      !window.confirm("Switch back to C mode? Your JSON edits will be replaced by the layout generated from the C snippet.")) {
+    return;
+  }
+  mode = m;
+  jsonDirty = false;
+  cEditor.setReadOnly(m === "json");
+  jsonEditor.setReadOnly(m === "c");
+  $("annotations-fieldset").disabled = m === "json";
+  $("mode-toggle").textContent = m === "c" ? "Edit JSON directly" : "Back to C snippet";
+  $("json-status").textContent = m === "c"
+    ? "read-only view of the generated layout — click to edit"
+    : "JSON is now the source of truth; the C snippet is locked";
+  rerender();
 }
 
 function download(name, mime, content) {
@@ -269,8 +308,8 @@ function download(name, mime, content) {
 }
 
 function layoutJson() {
-  const structs = layouts.map((sl) => annotate(sl));
-  return JSON.stringify({ structs }, null, 2) + "\n";
+  if (mode === "json") return jsonEditor.get().trimEnd() + "\n";
+  return JSON.stringify({ structs: annotatedStructs() }, null, 2) + "\n";
 }
 
 // --- wire up ---
@@ -282,7 +321,8 @@ for (const [name, code] of Object.entries(EXAMPLES)) {
   b.className = "secondary";
   b.textContent = name;
   b.addEventListener("click", () => {
-    $("snippet").value = code;
+    if (mode !== "c") setMode("c");
+    cEditor.set(code);
     annStore = { ...(EXAMPLE_ANNOTATIONS[name] || {}) };
     annCurrent = null;
     rerender();
@@ -296,8 +336,9 @@ function scheduleRender() {
   timer = setTimeout(rerender, 200);
 }
 
-$("snippet").addEventListener("input", scheduleRender);
 $("customcss").addEventListener("input", scheduleRender);
+$("mode-toggle").addEventListener("click", () =>
+  setMode(mode === "c" ? "json" : "c"));
 $("theme").addEventListener("change", () => { syncCssBox(); rerender(); });
 for (const id of ["theme", "ppb", "ruler", "padcallout", "transparent",
                   "responsive"]) {
@@ -323,6 +364,27 @@ $("dl-json").addEventListener("click", () => {
   download("layout.json", "application/json", layoutJson());
 });
 
-$("snippet").value = EXAMPLES["client (padding demo)"];
+let jsonDirty = false;
+const cEditor = makeEditor({
+  parent: $("snippet-editor"), lang: "c",
+  doc: EXAMPLES["client (padding demo)"],
+  onChange: () => { if (mode === "c") scheduleRender(); },
+});
+const jsonEditor = makeEditor({
+  parent: $("json-editor"), lang: "json", readOnly: true,
+  onChange: () => { if (mode === "json") { jsonDirty = true; scheduleRender(); } },
+});
+jsonEditor.setReadOnly(true);
+
+// scripting/test hook
+window.fieldday = {
+  setSnippet: (t) => { if (mode !== "c") setMode("c"); cEditor.set(t); rerender(); },
+  getSnippet: () => cEditor.get(),
+  setJson: (t) => { jsonEditor.set(t); jsonDirty = true; rerender(); },
+  getJson: () => jsonEditor.get(),
+  setMode,
+  getMode: () => mode,
+};
+
 syncCssBox();
 rerender();
