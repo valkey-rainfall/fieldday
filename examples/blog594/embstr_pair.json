@@ -4,7 +4,7 @@
       "name": "embstr_before",
       "size": 16,
       "align": 8,
-      "title": "Before: ptr points at the string stored 8 bytes away",
+      "title": "Before: ptr points at the value stored just bytes away",
       "fields": [
         {"name": "type", "offset": 0, "size": 0, "bit_offset": 0, "bit_width": 4},
         {"name": "encoding", "offset": 0, "size": 0, "bit_offset": 4, "bit_width": 4},
@@ -13,18 +13,20 @@
         {"name": "ptr", "offset": 8, "size": 8, "is_pointer": true}
       ],
       "extras": [
-        {"label": "embedded string (sds)", "bytes": 24, "kind": "embedded"}
+        {"label": "key hdr size", "bytes": 1, "kind": "embedded"},
+        {"label": "key sds (10B + hdr)", "bytes": 14, "kind": "embedded"},
+        {"label": "value sds (20B + hdr)", "bytes": 24, "kind": "embedded"}
       ],
       "arrows": [
-        {"from": "ptr", "to": "embedded string (sds)"}
+        {"from": "ptr", "to": "value sds (20B + hdr)"}
       ],
-      "note": "the pointer spends 8 bytes to point at data that always follows it"
+      "note": "the pointer spends 8 bytes to locate a value that always follows it"
     },
     {
       "name": "embstr_after",
       "size": 8,
       "align": 8,
-      "title": "Valkey 9.1: the string moves into the former ptr slot",
+      "title": "Valkey 9.1: the embedded data moves into the former ptr slot",
       "fields": [
         {"name": "type", "offset": 0, "size": 0, "bit_offset": 0, "bit_width": 4},
         {"name": "encoding", "offset": 0, "size": 0, "bit_offset": 4, "bit_width": 4},
@@ -32,9 +34,12 @@
         {"name": "refcount", "offset": 4, "size": 4}
       ],
       "extras": [
-        {"label": "embedded string (sds)", "bytes": 24, "kind": "embedded"}
+        {"label": "key hdr size", "bytes": 1, "kind": "embedded"},
+        {"label": "key sds (10B + hdr)", "bytes": 14, "kind": "embedded"},
+        {"label": "value sds (20B + hdr)", "bytes": 24, "kind": "embedded"}
       ],
-      "note": "8 bytes saved on every embstr object"
+      "note": "8 bytes saved on every embstr object",
+      "note_style": "savings"
     }
   ]
 }

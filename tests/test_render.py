@@ -272,3 +272,15 @@ class TestAnnotations:
         import pytest as _pytest
         with _pytest.raises(ValueError, match="arrow endpoint"):
             render_struct(sl, RenderOptions())
+
+    def test_note_plain_by_default(self):
+        sl = self._layout(note="just an observation")
+        svg = render_struct(sl, RenderOptions())
+        assert 'class="fd-note-plain"' in svg
+        assert "\u25bc just" not in svg
+
+    def test_note_savings_style(self):
+        sl = self._layout(note="8 bytes saved")
+        sl.note_style = "savings"
+        svg = render_struct(sl, RenderOptions())
+        assert 'class="fd-note"' in svg and "\u25bc 8 bytes saved" in svg

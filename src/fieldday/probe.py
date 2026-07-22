@@ -50,7 +50,8 @@ class StructLayout:
     # hand-annotation extensions (populated via layout JSON, not the probe):
     # extras: companion allocations [{label, bytes, kind: embedded|separate}]
     extras: list = field(default_factory=list)
-    note: str | None = None   # savings/summary line rendered in accent color
+    note: str | None = None   # hand-written note line under the diagram
+    note_style: str = "plain"  # plain (neutral) | savings (green, ▼ prefix)
     title: str | None = None  # hand-written diagram title
     relabel: dict = field(default_factory=dict)  # member -> custom label ('' hides)
     arrows: list = field(default_factory=list)  # [{from, to}] pointer arrows
@@ -235,6 +236,7 @@ def layouts_to_json(layouts: list[StructLayout]) -> str:
              "fields": [enc(f) for f in s.fields],
              **({"extras": s.extras} if s.extras else {}),
              **({"note": s.note} if s.note else {}),
+             **({"note_style": s.note_style} if s.note and s.note_style != "plain" else {}),
              **({"title": s.title} if s.title else {}),
              **({"relabel": s.relabel} if s.relabel else {}),
              **({"arrows": s.arrows} if s.arrows else {})}
