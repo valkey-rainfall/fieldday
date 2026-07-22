@@ -30,6 +30,13 @@ CORPUS = {
     "pointer_fields": "struct p { void *ptr; int x; };",
     "char_array": "struct p { char buf[13]; long l; };",
     "multidim_sizes": "struct p { int a[4]; short b[3]; };",
+    "inline_nested_dividers": """
+        struct outer3 { struct inner3 { long a; int b; } in; char t; };
+    """,
+    "cross_ref_inline_tag": """
+        struct outer5 { struct inner5 { long a; int b; } in; char t; };
+        struct other5 { struct inner5 n; short s; };
+    """,
     "nested_bitfield_dividers": """
         struct bfinner { unsigned a : 4; unsigned b : 12; int c; };
         struct bfouter { char pre; struct bfinner in; };

@@ -151,3 +151,4 @@ button.secondary:hover { background: var(--vk-surface); }
   .pane-input { max-width: none; }
 }
 #customcss { width: 100%; font-family: "Fira Mono", monospace; font-size: 13px; border: 1px solid var(--vk-border); border-radius: 6px; padding: 10px; background: var(--vk-surface); resize: vertical; }
+#relabel { width: 100%; font-family: "Fira Mono", monospace; font-size: 13px; border: 1px solid var(--vk-border); border-radius: 6px; padding: 10px; background: var(--vk-surface); resize: vertical; }

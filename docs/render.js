@@ -64,19 +64,25 @@ function paddingBytes(sl) {
 }
 
 function segmentsFromLayout(sl, opts) {
+  const relabel = sl.relabel || {};
   const segs = [];
   for (const f of sl.fields) {
+    // manual relabel: custom label used verbatim; '' hides the label
+    const custom = f.is_padding ? undefined : relabel[f.name];
     if (f.bit_offset !== undefined && f.bit_offset !== null) {
       let label = f.name;
       if (opts.showBitWidths && f.bit_width) label = `${f.name}:${f.bit_width}`;
+      if (custom !== undefined) label = custom;
       segs.push({ label, startBits: f.bit_offset, widthBits: f.bit_width || 0,
                   isBitfield: true });
     } else if (f.size === 0 && !f.is_padding) {
       // flexible array member: nominal 1-byte box dangling past the end
-      segs.push({ label: f.name + "[]", startBits: f.offset * 8, widthBits: 8,
+      const label = custom !== undefined ? custom : f.name + "[]";
+      segs.push({ label, startBits: f.offset * 8, widthBits: 8,
                   isFlex: true });
     } else {
-      const name = (f.is_pointer && !f.name.startsWith("*")) ? "*" + f.name : f.name;
+      let name = (f.is_pointer && !f.name.startsWith("*")) ? "*" + f.name : f.name;
+      if (custom !== undefined) name = custom;
       segs.push({ label: f.is_padding ? "pad" : name,
                   startBits: f.offset * 8, widthBits: f.size * 8,
                   isPadding: !!f.is_padding,
@@ -110,7 +116,7 @@ function planLabels(segs, opts, x0) {
       inline.push([seg, textW("pad", opts.fontSize) + 8 <= w ? "pad" : ""]);
       continue;
     }
-    if (textW(seg.label, opts.fontSize) + 8 <= w) {
+    if (!seg.label || textW(seg.label, opts.fontSize) + 8 <= w) {
       inline.push([seg, seg.label]);
     } else {
       const cx = x0 + (seg.startBits + seg.widthBits / 2) / 8 * ppb;

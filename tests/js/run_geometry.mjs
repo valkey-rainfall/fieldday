@@ -185,6 +185,15 @@ check("extra_css_appended", () => {
   assert(svg.includes(".fd-field { fill: pink; }"), "custom css missing");
 });
 
+
+check("relabel_and_hide", () => {
+  const sl = computeLayouts("struct s { long a; long b; unsigned f : 4; };")[0];
+  sl.relabel = { a: "cool label", b: "", f: "flags!" };
+  const svg = renderStruct(sl);
+  assert(svg.includes("cool label") && svg.includes("flags!"), "custom labels missing");
+  assert(!svg.includes(">b<") && !svg.includes(">f:4<"), "hidden/original labels leaked");
+});
+
 console.log(`geometry: ${pass} passed, ${fail} failed`);
 if (failures.length) {
   for (const f of failures) console.error("FAIL " + f);

@@ -55,6 +55,8 @@ class FieldDecl:
 class StructDecl:
     name: str
     fields: list[FieldDecl] = field(default_factory=list)
+    emitted: bool = True   # False: inline-defined tag, probed for divider
+                           # boundaries but not part of the output
 
 
 @dataclass
@@ -214,14 +216,22 @@ def parse_snippet(text: str) -> Snippet:
     structs: list[StructDecl] = []
     struct_names: set[str] = set()
 
-    def visit_struct(node, name_hint=None):
+    def visit_struct(node, name_hint=None, emitted=True):
         name = node.name or name_hint
         if not name or node.decls is None:
             return
-        sd = StructDecl(name=name)
+        sd = StructDecl(name=name, emitted=emitted)
         for d in node.decls:
-            if isinstance(d, c_ast.Decl):
-                sd.fields.append(_field_from_decl(d, struct_names))
+            if not isinstance(d, c_ast.Decl):
+                continue
+            # inline tagged struct definition: register hidden so the probe
+            # can measure its internal boundaries (C gives tags file scope)
+            inner = d.type
+            while isinstance(inner, (c_ast.ArrayDecl, c_ast.PtrDecl, c_ast.TypeDecl)):
+                inner = inner.type
+            if isinstance(inner, c_ast.Struct) and inner.decls is not None and inner.name:
+                visit_struct(inner, emitted=False)
+            sd.fields.append(_field_from_decl(d, struct_names))
         structs.append(sd)
         struct_names.add(name)
 

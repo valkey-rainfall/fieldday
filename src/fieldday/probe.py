@@ -52,6 +52,7 @@ class StructLayout:
     extras: list = field(default_factory=list)
     note: str | None = None   # savings/summary line rendered in accent color
     title: str | None = None  # hand-written diagram title
+    relabel: dict = field(default_factory=dict)  # member -> custom label ('' hides)
 
     @property
     def padding_bytes(self) -> int:
@@ -87,7 +88,7 @@ def _emit_probe_c(snippet: Snippet) -> str:
         "int main(void) {",
     ]
     for s in snippet.structs:
-        tag = f"struct {s.name}" if _needs_tag(snippet, s) else s.name
+        tag = f"struct {s.name}" if (not s.emitted or _needs_tag(snippet, s)) else s.name
         lines.append(f'    printf("STRUCT {s.name} %zu %zu\\n", '
                      f"sizeof({tag}), _Alignof({tag}));")
         for f in s.fields:
@@ -187,7 +188,9 @@ def compute_layouts(snippet: Snippet) -> list[StructLayout]:
             decl = decl_by_struct[current.name][parts[1]]
             size = int(parts[3])
             dividers = None
-            if decl.array_len and decl.array_len > 1 and size % decl.array_len == 0:
+            if size == 0:
+                pass
+            elif decl.array_len and decl.array_len > 1 and size % decl.array_len == 0:
                 elem = size // decl.array_len
                 dividers = [k * elem for k in range(1, decl.array_len)]
             elif decl.struct_ref and not decl.is_pointer:
@@ -209,7 +212,8 @@ def compute_layouts(snippet: Snippet) -> list[StructLayout]:
                 bit_offset=bit_off, bit_width=bit_w))
     if current:
         layouts.append(_finalize(current))
-    return layouts
+    emitted = {s.name for s in snippet.structs if s.emitted}
+    return [l for l in layouts if l.name in emitted]
 
 
 def _finalize(sl: StructLayout) -> StructLayout:
@@ -228,6 +232,7 @@ def layouts_to_json(layouts: list[StructLayout]) -> str:
              "fields": [enc(f) for f in s.fields],
              **({"extras": s.extras} if s.extras else {}),
              **({"note": s.note} if s.note else {}),
-             **({"title": s.title} if s.title else {})}
+             **({"title": s.title} if s.title else {}),
+             **({"relabel": s.relabel} if s.relabel else {})}
             for s in layouts]},
         indent=2)

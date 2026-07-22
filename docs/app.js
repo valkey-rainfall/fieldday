@@ -1,7 +1,7 @@
 /* fieldday web app: live editor -> layout.js -> render.js -> inline SVG. */
 
 import { computeLayouts, LayoutError } from "./layout.js";
-import { renderStruct, THEMES } from "./render.js";
+import { renderStruct, THEMES, DEFAULT_THEME } from "./render.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -36,6 +36,17 @@ typedef struct zskiplistNode {
         unsigned long span;
     } level[];
 } zskiplistNode;`,
+  "composite struct (subdivisions)": `struct inner {
+    long a;
+    int b;
+    short c;
+};
+struct outer {
+    int values[5];
+    struct inner nested;
+    struct tagged { void *p; uint32_t n; } inline_def;
+    char tag;
+};`,
   "stub directive": `//@ stub robj 16 8
 struct entry {
     robj *obj;
@@ -43,6 +54,23 @@ struct entry {
     struct entry *next;
 };`,
 };
+
+function themeCssTemplate(themeName) {
+  const t = { ...DEFAULT_THEME, ...(THEMES[themeName] || {}) };
+  const lines = Object.entries(t)
+    .map(([k, v]) => `  --fd-${k}: ${v};`).join("\n");
+  return `:root {\n${lines}\n}`;
+}
+
+let lastCssTemplate = "";
+
+function syncCssBox() {
+  const box = $("customcss");
+  const tpl = themeCssTemplate($("theme").value);
+  // don't clobber user edits: only replace if untouched or still a template
+  if (!box.value.trim() || box.value === lastCssTemplate) box.value = tpl;
+  lastCssTemplate = tpl;
+}
 
 let layouts = [];          // last successful computeLayouts result
 let currentSvgs = [];      // [{name, svg}] from last render
@@ -65,6 +93,21 @@ function parseExtras(text) {
     extras.push({ label: parts[0], bytes, kind });
   }
   return extras;
+}
+
+function parseRelabel(text) {
+  const relabel = {};
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    const bar = line.indexOf("|");
+    if (bar < 0) throw new LayoutError(
+      `bad relabel line: '${line}' (expected: member | new label, empty label hides)`);
+    const member = line.slice(0, bar).trim();
+    if (!member) throw new LayoutError(`bad relabel line: '${line}' (missing member name)`);
+    relabel[member] = line.slice(bar + 1).trim();
+  }
+  return relabel;
 }
 
 function selectedStructIndex() {
@@ -113,6 +156,7 @@ function annotate(sl, isSelected) {
   if (title) copy.title = title;
   if (note) copy.note = note;
   copy.extras = parseExtras($("extras").value);
+  copy.relabel = parseRelabel($("relabel").value);
   return copy;
 }
 
@@ -176,6 +220,8 @@ function scheduleRender() {
 $("snippet").addEventListener("input", scheduleRender);
 $("extras").addEventListener("input", scheduleRender);
 $("customcss").addEventListener("input", scheduleRender);
+$("relabel").addEventListener("input", scheduleRender);
+$("theme").addEventListener("change", () => { syncCssBox(); rerender(); });
 for (const id of ["theme", "ppb", "ruler", "padcallout", "transparent",
                   "responsive", "title", "note", "structpick"]) {
   $(id).addEventListener("change", rerender);
@@ -194,4 +240,5 @@ $("dl-json").addEventListener("click", () => {
 });
 
 $("snippet").value = EXAMPLES["client (padding demo)"];
+syncCssBox();
 rerender();

@@ -139,15 +139,25 @@ class Parser {
       if (this.peek() !== "{") tag = this.next();
       if (this.peek() === "{") {
         // inline nested struct definition: struct level { ... } lvl[];
+        // registered hidden (probed for divider boundaries, not emitted);
+        // the field references it by tag, matching the Python reference.
         const nested = this.parseStructBody(tag);
         const info = this.computeLayout(nested, tag ?? "<anon>");
-        if (tag) this.structs.set(`struct ${tag}`, { size: info.size, align: info.align });
-        base = { size: info.size, align: info.align, structRef: null, incomplete: false };
+        const bounds = [...new Set(info.fields.filter((f) => f.offset > 0)
+          .map((f) => f.offset))].sort((a, b) => a - b);
+        if (tag) {
+          this.structs.set(`struct ${tag}`, { size: info.size, align: info.align,
+                                              emitted: false, bounds });
+          this.structs.set(tag, { size: info.size, align: info.align,
+                                  emitted: false, bounds });
+        }
+        base = { size: info.size, align: info.align,
+                 structRef: tag ?? null, incomplete: false };
       } else if (this.openTags.has(tag) || this.structs.has(`struct ${tag}`)) {
         const known = this.structs.get(`struct ${tag}`);
         // self-reference is only usable via pointer; mark incomplete
         base = known
-          ? { size: known.size, align: known.align, structRef: known.emitted ? tag : null, incomplete: false }
+          ? { size: known.size, align: known.align, structRef: tag, incomplete: false }
           : { size: 0, align: 0, structRef: null, incomplete: true };
       } else {
         throw new LayoutError(`unknown struct type 'struct ${tag}' — define it earlier in the snippet`);
@@ -170,7 +180,7 @@ class Parser {
         base = { size: this.stubs[name][0], align: this.stubs[name][1], structRef: null, incomplete: false };
       } else if (this.structs.has(name)) {
         const s = this.structs.get(name);
-        base = { size: s.size, align: s.align, structRef: s.emitted ? name : null, incomplete: false };
+        base = { size: s.size, align: s.align, structRef: name, incomplete: false };
       } else if (name in BUILTIN_STUBS) {
         base = { size: BUILTIN_STUBS[name][0], align: BUILTIN_STUBS[name][1], structRef: null, incomplete: false };
       } else {
@@ -255,7 +265,9 @@ class Parser {
         let byteCursor = Math.ceil(bitCursor / 8);
         byteCursor = Math.ceil(byteCursor / elemAlign) * elemAlign;
         let dividers = null;
-        if (f.arrayLen !== null && f.arrayLen > 1 && totalSize % f.arrayLen === 0) {
+        if (f.arrayLen === 0) {
+          // flexible array member: no dividers on a zero-size field
+        } else if (f.arrayLen !== null && f.arrayLen > 1 && totalSize % f.arrayLen === 0) {
           dividers = [];
           for (let k = 1; k < f.arrayLen; k++) dividers.push(k * elemSize);
         } else if (f.structRef && !f.isPointer) {

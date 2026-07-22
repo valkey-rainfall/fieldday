@@ -225,3 +225,13 @@ class TestAnnotations:
         sl = compute_layouts(parse_snippet("struct s { int x[5]; int tail; };"))[0]
         svg = render_struct(sl, RenderOptions())
         assert svg.count('class="fd-subdiv"') == 4  # 5 elements -> 4 dividers
+
+    def test_relabel_and_hide(self):
+        from fieldday.cparse import parse_snippet
+        from fieldday.probe import compute_layouts
+        sl = compute_layouts(parse_snippet(
+            "struct s { long a; long b; unsigned f : 4; };"))[0]
+        sl.relabel = {"a": "cool label", "b": "", "f": "flags!"}
+        svg = render_struct(sl, RenderOptions())
+        assert "cool label" in svg and "flags!" in svg
+        assert ">b<" not in svg and ">f:4<" not in svg

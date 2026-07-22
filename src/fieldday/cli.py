@@ -61,7 +61,7 @@ def layouts_from_json(text: str) -> list[StructLayout]:
     for s in data["structs"]:
         sl = StructLayout(name=s["name"], size=s["size"], align=s.get("align", 8),
                           extras=s.get("extras", []), note=s.get("note"),
-                          title=s.get("title"))
+                          title=s.get("title"), relabel=s.get("relabel", {}))
         for f in s["fields"]:
             sl.fields.append(FieldLayout(
                 name=f["name"], type_str=f.get("type_str", ""),

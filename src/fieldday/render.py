@@ -79,19 +79,27 @@ class Segment:
 
 
 def segments_from_layout(sl: StructLayout, opts: RenderOptions) -> list[Segment]:
+    relabel = sl.relabel or {}
     segs: list[Segment] = []
     for f in sl.fields:
+        # manual relabel: custom label used verbatim; '' hides the label
+        custom = relabel.get(f.name) if not f.is_padding else None
         if f.bit_offset is not None:
             label = f.name
             if opts.show_bit_widths and f.bit_width:
                 label = f"{f.name}:{f.bit_width}"
+            if custom is not None:
+                label = custom
             segs.append(Segment(label, f.bit_offset, f.bit_width or 0,
                                 is_bitfield=True))
         elif f.size == 0 and not f.is_padding:
             # flexible array member: nominal 1-byte box dangling past the end
-            segs.append(Segment(f.name + "[]", f.offset * 8, 8, is_flex=True))
+            label = f.name + "[]" if custom is None else custom
+            segs.append(Segment(label, f.offset * 8, 8, is_flex=True))
         else:
             name = ("*" + f.name) if f.is_pointer and not f.name.startswith("*") else f.name
+            if custom is not None:
+                name = custom
             segs.append(Segment("pad" if f.is_padding else name,
                                 f.offset * 8, f.size * 8,
                                 is_padding=f.is_padding,
@@ -135,7 +143,7 @@ def plan_labels(segs: list[Segment], opts: RenderOptions, x0: float):
             # padding is self-identifying by hatch; label only when roomy
             inline.append((seg, "pad" if _text_w("pad", opts.font_size) + 8 <= w else ""))
             continue
-        if _text_w(seg.label, opts.font_size) + 8 <= w:
+        if not seg.label or _text_w(seg.label, opts.font_size) + 8 <= w:
             inline.append((seg, seg.label))
         else:
             cx = x0 + (seg.start_bits + seg.width_bits / 2) / 8 * ppb

@@ -176,6 +176,102 @@
       ]
     },
     {
+      "name": "inline_nested_dividers",
+      "snippet": "\n        struct outer3 { struct inner3 { long a; int b; } in; char t; };\n    ",
+      "expected": [
+        {
+          "name": "outer3",
+          "size": 24,
+          "align": 8,
+          "fields": [
+            {
+              "name": "in",
+              "offset": 0,
+              "size": 16,
+              "struct_ref": "inner3",
+              "dividers": [
+                8,
+                12
+              ]
+            },
+            {
+              "name": "t",
+              "offset": 16,
+              "size": 1
+            },
+            {
+              "name": "pad",
+              "offset": 17,
+              "size": 7,
+              "is_padding": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cross_ref_inline_tag",
+      "snippet": "\n        struct outer5 { struct inner5 { long a; int b; } in; char t; };\n        struct other5 { struct inner5 n; short s; };\n    ",
+      "expected": [
+        {
+          "name": "outer5",
+          "size": 24,
+          "align": 8,
+          "fields": [
+            {
+              "name": "in",
+              "offset": 0,
+              "size": 16,
+              "struct_ref": "inner5",
+              "dividers": [
+                8,
+                12
+              ]
+            },
+            {
+              "name": "t",
+              "offset": 16,
+              "size": 1
+            },
+            {
+              "name": "pad",
+              "offset": 17,
+              "size": 7,
+              "is_padding": true
+            }
+          ]
+        },
+        {
+          "name": "other5",
+          "size": 24,
+          "align": 8,
+          "fields": [
+            {
+              "name": "n",
+              "offset": 0,
+              "size": 16,
+              "struct_ref": "inner5",
+              "dividers": [
+                8,
+                12
+              ]
+            },
+            {
+              "name": "s",
+              "offset": 16,
+              "size": 2
+            },
+            {
+              "name": "pad",
+              "offset": 18,
+              "size": 6,
+              "is_padding": true
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "nested_bitfield_dividers",
       "snippet": "\n        struct bfinner { unsigned a : 4; unsigned b : 12; int c; };\n        struct bfouter { char pre; struct bfinner in; };\n    ",
       "expected": [
@@ -615,7 +711,8 @@
             {
               "name": "lvl",
               "offset": 24,
-              "size": 0
+              "size": 0,
+              "struct_ref": "level"
             }
           ]
         }
@@ -812,7 +909,8 @@
             {
               "name": "level",
               "offset": 24,
-              "size": 0
+              "size": 0,
+              "struct_ref": "zskiplistLevel"
             }
           ]
         }
