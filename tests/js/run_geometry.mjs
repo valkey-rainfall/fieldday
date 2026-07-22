@@ -3,7 +3,7 @@
  * Run: node tests/js/run_geometry.mjs */
 
 import { computeLayouts } from "../../docs/layout.js";
-import { renderStruct } from "../../docs/render.js";
+import { renderStruct, jemallocSizeClass } from "../../docs/render.js";
 
 let pass = 0, fail = 0;
 const failures = [];
@@ -239,6 +239,18 @@ check("pointer_arrow_rendered", () => {
   const svg = renderStruct(sl);
   assert((svg.match(/class="fd-pointer-arrow"/g) || []).length === 1, "arrow missing");
   assert((svg.match(/class="fd-pointer-head"/g) || []).length === 1, "arrowhead missing");
+});
+
+check("jemalloc_size_class_exhaustive", () => {
+  // authoritative table from valkey deps/jemalloc/doc/jemalloc.xml
+  const classes = [8, 16, 32, 48, 64, 80, 96, 112, 128,
+                   160, 192, 224, 256, 320, 384, 448, 512,
+                   640, 768, 896, 1024, 1280, 1536, 1792, 2048,
+                   2560, 3072, 3584, 4096];
+  const doc = (n) => classes.find((c) => n <= c);
+  for (let n = 1; n <= 4096; n++) {
+    assert(jemallocSizeClass(n) === doc(n), `class(${n}) = ${jemallocSizeClass(n)}, want ${doc(n)}`);
+  }
 });
 
 console.log(`geometry: ${pass} passed, ${fail} failed`);
