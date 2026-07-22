@@ -1,0 +1,41 @@
+{
+  "structs": [
+    {
+      "name": "zslnode_before",
+      "size": 40,
+      "align": 8,
+      "title": "Before: each node points at a separately allocated member",
+      "fields": [
+        {"name": "ele", "offset": 0, "size": 8, "is_pointer": true},
+        {"name": "score", "offset": 8, "size": 8},
+        {"name": "backward", "offset": 16, "size": 8, "is_pointer": true},
+        {"name": "level-0", "offset": 24, "size": 16, "dividers": [8]}
+      ],
+      "extras": [
+        {"label": "level-1 … level-N", "bytes": 16, "kind": "embedded"},
+        {"label": "member sds (16B + hdr)", "bytes": 20, "kind": "separate", "dividers": [3, 19]}
+      ],
+      "arrows": [
+        {"from": "ele", "to": "member sds (16B + hdr)", "to_offset": 3}
+      ],
+      "note": "two allocations per member: the node, plus the sds string it points to"
+    },
+    {
+      "name": "zslnode_after",
+      "size": 32,
+      "align": 8,
+      "title": "Valkey 9.1: the member is embedded at the end of the node",
+      "fields": [
+        {"name": "score", "offset": 0, "size": 8},
+        {"name": "backward", "offset": 8, "size": 8, "is_pointer": true},
+        {"name": "level-0", "offset": 16, "size": 16, "dividers": [8]}
+      ],
+      "extras": [
+        {"label": "level-1 … level-N", "bytes": 16, "kind": "embedded"},
+        {"label": "member sds (16B + hdr)", "bytes": 20, "kind": "embedded", "dividers": [3, 19]}
+      ],
+      "note": "one allocation, no pointer — 7 bytes net saved per sorted set member",
+      "note_style": "savings"
+    }
+  ]
+}
