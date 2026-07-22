@@ -6,6 +6,29 @@ on:
   pull_request:
 
 jobs:
+  dco:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: DCO signoff check
+        # Every non-merge commit in history must carry a Signed-off-by
+        # trailer. The repo-bootstrap README commit predates the policy
+        # and is exempt.
+        run: |
+          BOOTSTRAP=8a9ca66d17aa16faf2a95bd5771b9d7253905307
+          missing=0
+          for h in $(git log HEAD --no-merges --format=%H); do
+            [ "$h" = "$BOOTSTRAP" ] && continue
+            if ! git show -s --format=%B "$h" | grep -q '^Signed-off-by: '; then
+              echo "::error::missing DCO signoff: $(git log -1 --oneline "$h")"
+              missing=1
+            fi
+          done
+          exit $missing
+
   test:
     runs-on: ubuntu-latest
     steps:
