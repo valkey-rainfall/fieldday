@@ -300,3 +300,26 @@ class TestAnnotations:
         head = _re.search(r'fd-pointer-head" points="[-\d.]+,[-\d.]+ [-\d.]+,[-\d.]+ ([-\d.]+),', svg)
         # extras start at struct end (8B); +3B offset at 15 px/byte, margin 24
         assert abs(float(head.group(1)) - (24 + (8 + 3) * 15)) < 0.11
+
+    def test_jemalloc_size_class_table(self):
+        from fieldday.render import jemalloc_size_class
+        for n, want in {1: 8, 9: 16, 40: 48, 100: 112, 129: 160,
+                        300: 320, 1100: 1280}.items():
+            assert jemalloc_size_class(n) == want
+
+    def test_jemalloc_slack_boxes(self):
+        sl = self._layout()  # 8B struct: exact class, no slack
+        svg = render_struct(sl, RenderOptions(jemalloc_slack=True))
+        assert svg.split("</style>")[1].count("fd-slack-box") == 0
+        sl = self._layout(extras=[{"label": "e", "bytes": 12, "kind": "embedded"}])
+        svg = render_struct(sl, RenderOptions(jemalloc_slack=True))  # 20B -> 32B
+        assert svg.split("</style>")[1].count("fd-slack-box") == 1
+        assert "+12B (32B class)" in svg
+
+    def test_jemalloc_slack_skips_fam(self):
+        from fieldday.cparse import parse_snippet
+        from fieldday.probe import compute_layouts
+        sl = compute_layouts(parse_snippet(
+            "struct s { long a; struct lv { long f; } lvl[]; };"))[0]
+        svg = render_struct(sl, RenderOptions(jemalloc_slack=True))
+        assert "fd-slack-box" not in svg.split("</style>")[1]
