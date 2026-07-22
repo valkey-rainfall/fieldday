@@ -19,19 +19,19 @@ function render(snippet, opts = {}) {
 
 function rects(svg) {
   const out = [];
-  const re = /<rect class="(fd-field-box|fd-padding-box)" x="(-?[\d.]+)" y="(-?[\d.]+)" width="(-?[\d.]+)"/g;
+  const re = /<rect class="(fd-field-box|fd-padding-box)"[^>]*? x="(-?[\d.]+)" y="(-?[\d.]+)" width="(-?[\d.]+)"/g;
   for (const m of svg.matchAll(re)) out.push([parseFloat(m[2]), parseFloat(m[4])]);
   return out;
 }
 
 function leaderSegments(svg) {
   const segs = [];
-  const pre = /<path class="fd-leader-line" d="M (-?[\d.]+) (-?[\d.]+) V (-?[\d.]+) H (-?[\d.]+) V (-?[\d.]+)"/g;
+  const pre = /<path class="fd-leader-line"[^>]*? d="M (-?[\d.]+) (-?[\d.]+) V (-?[\d.]+) H (-?[\d.]+) V (-?[\d.]+)"/g;
   for (const m of svg.matchAll(pre)) {
     const [x1, y1, ey, tx, by] = m.slice(1).map(parseFloat);
     segs.push([[x1, y1, x1, ey], [x1, ey, tx, ey], [tx, ey, tx, by]]);
   }
-  const lre = /<line class="fd-leader-line" x1="(-?[\d.]+)" y1="(-?[\d.]+)" x2="(-?[\d.]+)" y2="(-?[\d.]+)"/g;
+  const lre = /<line class="fd-leader-line"[^>]*? x1="(-?[\d.]+)" y1="(-?[\d.]+)" x2="(-?[\d.]+)" y2="(-?[\d.]+)"/g;
   for (const m of svg.matchAll(lre)) {
     const [x1, y1, x2, y2] = m.slice(1).map(parseFloat);
     segs.push([[x1, y1, x2, y2]]);
@@ -41,7 +41,7 @@ function leaderSegments(svg) {
 
 function calloutLabels(svg) {
   const out = [];
-  const re = /<text class="fd-callout-label" x="(-?[\d.]+)" y="(-?[\d.]+)" font-size="(\d+)"[^>]*>([^<]+)<\/text>/g;
+  const re = /<text class="fd-callout-label"[^>]*? x="(-?[\d.]+)" y="(-?[\d.]+)" font-size="(\d+)"[^>]*>([^<]+)<\/text>/g;
   for (const m of svg.matchAll(re)) {
     const x = parseFloat(m[1]), size = parseInt(m[3], 10), text = m[4];
     const w = text.length * size * 0.62;
@@ -220,7 +220,7 @@ check("bitfield_unit_padding_tiled", () => {
     "struct s { uint64_t a; unsigned f : 12; unsigned p : 1; void *q; };")[0],
     { pxPerByte: 16, margin: 20 });
   const boxes = [];
-  const re = /<rect class="(?:fd-field-box|fd-padding-box)" x="(-?[\d.]+)" y="(-?[\d.]+)" width="(-?[\d.]+)"/g;
+  const re = /<rect class="(?:fd-field-box|fd-padding-box)"[^>]*? x="(-?[\d.]+)" y="(-?[\d.]+)" width="(-?[\d.]+)"/g;
   for (const m of svg.matchAll(re)) boxes.push([parseFloat(m[1]), parseFloat(m[3])]);
   boxes.sort((a, b) => a[0] - b[0]);
   let cursor = boxes[0][0];

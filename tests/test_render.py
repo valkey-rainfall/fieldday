@@ -22,7 +22,7 @@ def render(snippet, **kw):
 
 def rects(svg, cls):
     out = []
-    for m in re.finditer(r'<rect class="(fd-field-box|fd-padding-box)" x="(-?[\d.]+)" y="(-?[\d.]+)" '
+    for m in re.finditer(r'<rect class="(fd-field-box|fd-padding-box)"[^>]*? x="(-?[\d.]+)" y="(-?[\d.]+)" '
                          r'width="(-?[\d.]+)"', svg):
         if m.group(1) == cls or cls == "*":
             out.append((float(m.group(2)), float(m.group(4))))
@@ -297,7 +297,7 @@ class TestAnnotations:
         opts = RenderOptions()
         svg = render_struct(sl, opts)
         import re as _re
-        head = _re.search(r'fd-pointer-head" points="[-\d.]+,[-\d.]+ [-\d.]+,[-\d.]+ ([-\d.]+),', svg)
+        head = _re.search(r'fd-pointer-head"[^>]*? points="[-\d.]+,[-\d.]+ [-\d.]+,[-\d.]+ ([-\d.]+),', svg)
         # extras start at struct end (8B); +3B offset at 15 px/byte, margin 24
         assert abs(float(head.group(1)) - (24 + (8 + 3) * 15)) < 0.11
 
@@ -340,3 +340,30 @@ class TestAnnotations:
         assert len(notes) > 1  # wrapped into multiple lines
         from fieldday.render import _text_w
         assert all(24 + _text_w(t, 13) <= width for t in notes)
+    def test_css_survives_var_unsupported_renderers(self):
+        # macOS Preview / Inkscape drop var() declarations as invalid and
+        # fall back to SVG's default black fill. Every var() declaration
+        # must be immediately preceded by a baked declaration of the same
+        # property so legacy renderers keep the theme color.
+        import re as _re
+        svg = render_struct(
+            __import__("fieldday.probe", fromlist=["compute_layouts"]).compute_layouts(
+                __import__("fieldday.cparse", fromlist=["parse_snippet"]).parse_snippet(
+                    "struct s { long a; };"))[0], RenderOptions())
+        style = svg.split("<style>")[1].split("</style>")[0]
+        for m in _re.finditer(r"(fill|stroke|font-family): var\((--fd-[a-z-]+), ([^)]+)\)", style):
+            prop, _, val = m.groups()
+            assert f"{prop}: {val}; {prop}: var(" in style, \
+                f"var() declaration for {prop} lacks a baked fallback: {m.group(0)}"
+
+    def test_presentation_attrs_on_elements(self):
+        # style-stripping rasterizers (Slack thumbnails, macOS Preview)
+        # must still see theme colors via core SVG presentation attributes
+        from fieldday.cparse import parse_snippet
+        from fieldday.probe import compute_layouts
+        sl = compute_layouts(parse_snippet("struct s { char c; long l; };"))[0]
+        svg = render_struct(sl, RenderOptions())
+        body = svg.split("</style>")[1]
+        assert '<rect class="fd-field-box" fill="#6983ff" stroke="#30176e"' in body
+        assert '<rect class="fd-padding-box" fill="url(#fd-hatch)"' in body
+        assert 'class="fd-field-label" fill="#ffffff"' in body
