@@ -301,6 +301,28 @@ class TestAnnotations:
         # extras start at struct end (8B); +3B offset at 15 px/byte, margin 24
         assert abs(float(head.group(1)) - (24 + (8 + 3) * 15)) < 0.11
 
+    def test_separation_gap_has_pixel_floor(self):
+        # the gap before a separate allocation is 2 bytes at large scales
+        # but must never render narrower than MIN_SEP_GAP_PX, so the two
+        # byte rulers stay visually distinct at low px-per-byte
+        from fieldday.render import sep_gap_bits, SEP_GAP_BITS, MIN_SEP_GAP_PX
+        # large scale: byte-denominated gap already exceeds the floor
+        assert sep_gap_bits(RenderOptions(px_per_byte=14)) == SEP_GAP_BITS
+        # low scale: floored, whole-byte aligned, and >= MIN_SEP_GAP_PX
+        for ppb in (3.5, 5, 2):
+            bits = sep_gap_bits(RenderOptions(px_per_byte=ppb))
+            assert bits % 8 == 0
+            assert bits / 8 * ppb >= MIN_SEP_GAP_PX
+        # geometry: at 3.5 px/byte the separate extra's rect starts at
+        # least MIN_SEP_GAP_PX past the struct's end
+        sl = self._layout(extras=[{"label": "s", "bytes": 16, "kind": "separate"}])
+        svg = render_struct(sl, RenderOptions(px_per_byte=3.5))
+        import re as _re
+        xs = [float(m.group(1)) for m in
+              _re.finditer(r'<rect class="fd-extra-box"[^>]*? x="([\d.]+)"', svg)]
+        struct_end = 24 + 8 * 3.5  # margin + 8B struct
+        assert xs and xs[0] - struct_end >= 24
+
     def test_jemalloc_size_class_table(self):
         # exhaustive against the authoritative table in valkey
         # deps/jemalloc/doc/jemalloc.xml (64-bit, quantum=16, 4KiB page)

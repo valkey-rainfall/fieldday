@@ -21,6 +21,16 @@ export function jemallocSizeClass(n) {
   return Math.ceil(n / spacing) * spacing;
 }
 const SEP_GAP_BITS = 16;    // visual gap (2 'bytes') before a separate allocation bar
+const MIN_SEP_GAP_PX = 24;  // the gap never renders narrower than this many pixels
+
+// Gap before a separate allocation, in bits: byte-denominated at large
+// scales, floored at MIN_SEP_GAP_PX so low px-per-byte renders keep the
+// allocations -- and their byte rulers -- visually distinct. Rounded up
+// to whole bytes so allocation starts stay byte-aligned.
+function sepGapBits(opts) {
+  const floorBits = Math.ceil(MIN_SEP_GAP_PX / opts.pxPerByte) * 8;
+  return Math.max(SEP_GAP_BITS, floorBits);
+}
 
 // Default: light scheme matching the valkey.io blog.
 export const DEFAULT_THEME = {
@@ -128,7 +138,7 @@ function segmentsFromLayout(sl, opts) {
   for (const extra of sl.extras || []) {
     const kind = extra.kind || "embedded";
     const widthBits = Math.trunc(extra.bytes) * 8;
-    if (kind === "separate") cursor += SEP_GAP_BITS;
+    if (kind === "separate") cursor += sepGapBits(opts);
     segs.push({ label: extra.label, startBits: cursor, widthBits,
                 isExtra: true, extraKind: kind,
                 dividersBits: (extra.dividers || []).map((d) => d * 8) });
@@ -419,7 +429,7 @@ export function renderStruct(sl, userOpts = {}) {
     else if (seg.isExtra) {
       cls = "fd-extra-box";
       if (seg.extraKind === "separate") {
-        const gapPx = SEP_GAP_BITS / 8 * ppb;
+        const gapPx = sepGapBits(opts) / 8 * ppb;
         parts.push(textEl(x - gapPx / 2, barTop + opts.barHeight / 2 + 5,
                           "+", 17, "fd-allocation-plus", "middle", "700"));
       }

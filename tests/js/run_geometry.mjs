@@ -194,6 +194,23 @@ check("separate_extra_own_ruler", () => {
   assert(Math.max(...labels) === 16, `expected 16, got ${Math.max(...labels)}`);
   assert(labels.filter((x) => x === 0).length === 2, "expected two 0-origin rulers");
 });
+check("separation_gap_pixel_floor", () => {
+  // gap before a separate allocation must never render below 24px,
+  // even at low px-per-byte (2-byte gap would be 7px at ppb=3.5)
+  const sl = computeLayouts("struct s { long a; };")[0];
+  sl.extras = [{ label: "s", bytes: 16, kind: "separate" }];
+  const svg = renderStruct(sl, { pxPerByte: 3.5 });
+  const m = svg.match(/<rect class="fd-extra-box"[^>]*? x="([\d.]+)"/);
+  const structEnd = 24 + 8 * 3.5; // margin + 8B struct
+  assert(m && parseFloat(m[1]) - structEnd >= 24,
+         `gap ${m ? parseFloat(m[1]) - structEnd : "?"}px < 24px floor`);
+  // large scales unchanged: 2-byte gap at ppb=14 is 28px, above the floor
+  const svg14 = renderStruct(sl, { pxPerByte: 14 });
+  const m14 = svg14.match(/<rect class="fd-extra-box"[^>]*? x="([\d.]+)"/);
+  const end14 = 24 + 8 * 14;
+  assert(m14 && Math.abs(parseFloat(m14[1]) - end14 - 28) < 0.11,
+         "byte-denominated gap changed at large scale");
+});
 check("array_dividers_drawn", () => {
   const svg = renderStruct(computeLayouts("struct s { int x[5]; int tail; };")[0]);
   const n = (svg.match(/class="fd-subdivision-line"/g) || []).length;

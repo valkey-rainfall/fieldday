@@ -12,6 +12,7 @@ defaults; inlined into a page, the page's --fd-* variables win.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -33,6 +34,19 @@ def jemalloc_size_class(n: int) -> int:
     spacing = group // 8
     return (n + spacing - 1) // spacing * spacing
 SEP_GAP_BITS = 16  # visual gap (2 'bytes') before a separate allocation bar
+MIN_SEP_GAP_PX = 24  # the gap never renders narrower than this many pixels
+
+
+def sep_gap_bits(opts: "RenderOptions") -> int:
+    """Gap before a separate allocation, in bits.
+
+    Byte-denominated (SEP_GAP_BITS) at large scales, but floored at
+    MIN_SEP_GAP_PX so low px-per-byte renders keep the allocations --
+    and their byte rulers -- visually distinct. Rounded up to whole
+    bytes so allocation starts stay byte-aligned.
+    """
+    floor_bits = math.ceil(MIN_SEP_GAP_PX / opts.px_per_byte) * 8
+    return max(SEP_GAP_BITS, floor_bits)
 
 # Default: light scheme matching the valkey.io blog (white bg, #002a3a
 # headings, brand blues #6983ff/#30176e, gray surface #e2e8f0, Open Sans
@@ -145,7 +159,7 @@ def segments_from_layout(sl: StructLayout, opts: RenderOptions) -> list[Segment]
         kind = extra.get("kind", "embedded")
         width_bits = int(extra["bytes"]) * 8
         if kind == "separate":
-            cursor += SEP_GAP_BITS  # visual gap; '+' drawn in the gap
+            cursor += sep_gap_bits(opts)  # visual gap; '+' drawn in the gap
         segs.append(Segment(extra["label"], cursor, width_bits,
                             is_extra=True, extra_kind=kind,
                             dividers_bits=tuple(d * 8 for d in extra.get("dividers", ()))))
@@ -422,7 +436,7 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
         elif seg.is_extra:
             cls = "fd-extra-box"
             if seg.extra_kind == "separate":
-                gap_px = SEP_GAP_BITS / 8 * ppb
+                gap_px = sep_gap_bits(opts) / 8 * ppb
                 parts.append(_text(x - gap_px / 2, bar_top + opts.bar_height / 2 + 5,
                                    "+", 17, "fd-allocation-plus", weight="700"))
         else:
