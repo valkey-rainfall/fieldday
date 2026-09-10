@@ -93,6 +93,41 @@ class TestMultiStruct:
         sl = layout_of("typedef struct { int a; char b; } tiny;", "tiny")
         assert sl.size == 8 and pads(sl) == [(5, 3)]
 
+    def test_typedef_name_used_as_field_type(self):
+        # 'typedef struct node {...} node;' introduces 'node' as a type name.
+        # A naive scan stops at the first ';' inside the body and captures
+        # 'is_leaf' instead, so 'node' is reported as an unknown type.
+        sl = layout_of("""
+            typedef struct node { bool is_leaf; uint8_t num_items; } node;
+            typedef struct leafNode { node header; struct leafNode *prev; sds values[3]; } leafNode;
+        """, "leafNode")
+        assert sl.size == 40
+        hdr = field(sl, "header")
+        assert hdr.struct_ref == "node" and hdr.offset == 0 and hdr.size == 2
+        assert pads(sl) == [(2, 6)]
+
+    def test_typedef_array_alias_does_not_shadow(self):
+        # 'typedef uint64_t iter[3];' names 'iter', not '3'.
+        sl = layout_of("""
+            typedef uint64_t iter[3];
+            struct s { char c; iter it; };
+        """, "s")
+        assert sl.size == 32 and field(sl, "it").offset == 8
+
+    def test_bool_field_lays_out_as_c99_bool(self):
+        # 'bool' is a <stdbool.h> macro, not a keyword: without an alias
+        # neither pycparser nor the header-less probe program accepts it.
+        sl = layout_of("struct p { bool flag; long l; };")
+        assert sl.size == 16
+        assert field(sl, "flag").size == 1 and pads(sl) == [(1, 7)]
+
+    def test_size_t_field_does_not_conflict_with_stddef(self):
+        # The probe program includes <stddef.h>; a stub typedef for size_t
+        # is a redefinition error there, so the real type must be used.
+        sl = layout_of("struct p { char c; size_t n; ptrdiff_t d; };")
+        assert sl.size == 24
+        assert field(sl, "n").offset == 8 and field(sl, "d").offset == 16
+
     def test_comments_stripped(self):
         sl = layout_of("""
             struct p {

@@ -684,6 +684,129 @@
       ]
     },
     {
+      "name": "typedef_name_as_field_type",
+      "snippet": "\n        typedef struct node { bool is_leaf; uint8_t num_items; } node;\n        typedef struct leafNode { node header; struct leafNode *prev; sds values[3]; } leafNode;\n    ",
+      "expected": [
+        {
+          "name": "node",
+          "size": 2,
+          "align": 1,
+          "fields": [
+            {
+              "name": "is_leaf",
+              "offset": 0,
+              "size": 1
+            },
+            {
+              "name": "num_items",
+              "offset": 1,
+              "size": 1
+            }
+          ]
+        },
+        {
+          "name": "leafNode",
+          "size": 40,
+          "align": 8,
+          "fields": [
+            {
+              "name": "header",
+              "offset": 0,
+              "size": 2,
+              "struct_ref": "node",
+              "dividers": [
+                1
+              ]
+            },
+            {
+              "name": "pad",
+              "offset": 2,
+              "size": 6,
+              "is_padding": true
+            },
+            {
+              "name": "prev",
+              "offset": 8,
+              "size": 8,
+              "is_pointer": true
+            },
+            {
+              "name": "values",
+              "offset": 16,
+              "size": 24,
+              "dividers": [
+                8,
+                16
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "bool_field",
+      "snippet": "struct p { bool flag; long l; };",
+      "expected": [
+        {
+          "name": "p",
+          "size": 16,
+          "align": 8,
+          "fields": [
+            {
+              "name": "flag",
+              "offset": 0,
+              "size": 1
+            },
+            {
+              "name": "pad",
+              "offset": 1,
+              "size": 7,
+              "is_padding": true
+            },
+            {
+              "name": "l",
+              "offset": 8,
+              "size": 8
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "stddef_types",
+      "snippet": "struct p { char c; size_t n; ptrdiff_t d; };",
+      "expected": [
+        {
+          "name": "p",
+          "size": 24,
+          "align": 8,
+          "fields": [
+            {
+              "name": "c",
+              "offset": 0,
+              "size": 1
+            },
+            {
+              "name": "pad",
+              "offset": 1,
+              "size": 7,
+              "is_padding": true
+            },
+            {
+              "name": "n",
+              "offset": 8,
+              "size": 8
+            },
+            {
+              "name": "d",
+              "offset": 16,
+              "size": 8
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "flexible_array_member",
       "snippet": "\n        typedef struct node {\n            sds ele;\n            double score;\n            struct node *backward;\n            struct level { struct node *fwd; unsigned long span; } lvl[];\n        } node;\n    ",
       "expected": [
