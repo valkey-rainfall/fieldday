@@ -66,7 +66,7 @@ export function defaultOptions() {
     calloutFontSize: 12,
     ruler: true,           // byte ruler below the bar
     rulerStep: 0,          // bytes between labeled ticks; 0 = auto from pxPerByte
-    minDividerPx: 3.0,     // hide array/nested dividers packed tighter than this
+    minDividerPx: 4.0,     // hide array/nested dividers packed tighter than this
     cacheLine: 64,         // heavy tick every N bytes (0 disables)
     jemallocSlack: false,  // show size-class round-up waste per allocation
     paddingCallout: false, // opt-in "N of M bytes are padding" line
@@ -319,7 +319,7 @@ function presentationAttrs(theme) {
     "fd-cache-line-label": `fill="${t["text"]}" font-family="${font}"`,
     "fd-note": `fill="${t["highlight"]}" font-family="${font}"`,
     "fd-note-plain": `fill="${t["text"]}" font-family="${font}"`,
-    "fd-subdivision-line": `stroke="${t["field-text"]}" stroke-width="1" stroke-dasharray="2 3" opacity="0.45"`,
+    "fd-subdivision-line": `stroke="${t["field-text"]}" stroke-width="1" opacity="0.25"`,
     "fd-pointer-arrow": `stroke="${t["text"]}" stroke-width="1.5" fill="none"`,
     "fd-pointer-head": `fill="${t["text"]}"`,
     "fd-hatch-background": `fill="${t["padding-fill"]}"`,
@@ -363,7 +363,7 @@ function styleBlock(theme, extraCss = "") {
   text        { font-family: ${t["font"]}; font-family: var(--fd-font, ${t["font"]}); }
   .fd-hatch-background { fill: ${t["padding-fill"]}; fill: var(--fd-padding-fill, ${t["padding-fill"]}); }
   .fd-hatch-lines { stroke: ${t["padding-stroke"]}; stroke: var(--fd-padding-stroke, ${t["padding-stroke"]}); stroke-width: 1.5; }
-  .fd-subdivision-line  { stroke: ${t["field-text"]}; stroke: var(--fd-field-text, ${t["field-text"]}); stroke-width: 1; stroke-dasharray: 2 3; opacity: 0.45; }${tail}
+  .fd-subdivision-line  { stroke: ${t["field-text"]}; stroke: var(--fd-field-text, ${t["field-text"]}); stroke-width: 1; opacity: 0.25; }${tail}
 </style>`;
 }
 
@@ -445,9 +445,11 @@ export function renderStruct(sl, userOpts = {}) {
     } else cls = "fd-field-box";
     parts.push(`<rect class="${cls}" x="${f1(x)}" y="${f1(barTop)}" ` +
       `width="${f1(w)}" height="${opts.barHeight}" rx="${opts.cornerRadius}"/>`);
-    // Internal boundaries are only legible when elements are a few pixels
-    // wide. Below that (a char[254] at 0.3 px/byte) the lines fuse into a
-    // solid stripe and hide the field color, so draw none.
+    // Internal boundaries are thin solid lines at low opacity: dashes beat
+    // against themselves once elements are a few pixels wide, while solid
+    // lines read as a slot texture down to ~4 px. Below that (a char[254] at
+    // 0.3 px/byte) even solid lines fuse into a stripe that hides the field
+    // color, so draw none.
     const divs = seg.dividersBits || [];
     if (divs.length) {
       let spacing = Infinity, prev = 0;

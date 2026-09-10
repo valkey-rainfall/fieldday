@@ -73,7 +73,7 @@ class RenderOptions:
     callout_font_size: int = 12
     ruler: bool = True           # byte ruler below the bar
     ruler_step: int = 0           # bytes between labeled ticks; 0 = auto from px-per-byte
-    min_divider_px: float = 3.0   # hide array/nested dividers packed tighter than this
+    min_divider_px: float = 4.0   # hide array/nested dividers packed tighter than this
     cache_line: int = 64          # heavy tick every N bytes (0 disables)
     jemalloc_slack: bool = False  # show size-class round-up waste per allocation
     padding_callout: bool = False  # opt-in "N of M bytes are padding" line
@@ -325,7 +325,7 @@ def _presentation_attrs(theme: dict) -> dict:
         "fd-cache-line-label": f'fill="{t["text"]}" font-family="{font}"',
         "fd-note": f'fill="{t["highlight"]}" font-family="{font}"',
         "fd-note-plain": f'fill="{t["text"]}" font-family="{font}"',
-        "fd-subdivision-line": f'stroke="{t["field-text"]}" stroke-width="1" stroke-dasharray="2 3" opacity="0.45"',
+        "fd-subdivision-line": f'stroke="{t["field-text"]}" stroke-width="1" opacity="0.25"',
         "fd-pointer-arrow": f'stroke="{t["text"]}" stroke-width="1.5" fill="none"',
         "fd-pointer-head": f'fill="{t["text"]}"',
         "fd-hatch-background": f'fill="{t["padding-fill"]}"',
@@ -368,7 +368,7 @@ def _style_block(theme: dict, extra_css: str = "") -> str:
   text        {{ font-family: {t['font']}; font-family: var(--fd-font, {t['font']}); }}
   .fd-hatch-background {{ fill: {t['padding-fill']}; fill: var(--fd-padding-fill, {t['padding-fill']}); }}
   .fd-hatch-lines {{ stroke: {t['padding-stroke']}; stroke: var(--fd-padding-stroke, {t['padding-stroke']}); stroke-width: 1.5; }}
-  .fd-subdivision-line  {{ stroke: {t['field-text']}; stroke: var(--fd-field-text, {t['field-text']}); stroke-width: 1; stroke-dasharray: 2 3; opacity: 0.45; }}{tail}
+  .fd-subdivision-line  {{ stroke: {t['field-text']}; stroke: var(--fd-field-text, {t['field-text']}); stroke-width: 1; opacity: 0.25; }}{tail}
 </style>"""
 
 
@@ -444,9 +444,11 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
             cls = "fd-field-box"
         parts.append(f'<rect class="{cls}" x="{x:.1f}" y="{bar_top:.1f}" '
                      f'width="{w:.1f}" height="{opts.bar_height}" rx="{opts.corner_radius}"/>')
-        # Internal boundaries are only legible when elements are a few pixels
-        # wide. Below that (a char[254] at 0.3 px/byte) the lines fuse into a
-        # solid stripe and hide the field color, so draw none.
+        # Internal boundaries are thin solid lines at low opacity: dashes
+        # beat against themselves once elements are a few pixels wide, while
+        # solid lines read as a slot texture down to ~4 px. Below that (a
+        # char[254] at 0.3 px/byte) even solid lines fuse into a stripe that
+        # hides the field color, so draw none.
         if seg.dividers_bits:
             spacing = min(b - a for a, b in zip((0,) + seg.dividers_bits[:-1], seg.dividers_bits))
             if spacing / 8 * ppb >= opts.min_divider_px:

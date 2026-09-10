@@ -234,6 +234,21 @@ class TestAnnotations:
         svg = render_struct(sl, RenderOptions())
         assert svg.count('class="fd-subdivision-line"') == 4  # 5 elements -> 4 dividers
 
+    def test_array_dividers_are_solid_low_opacity(self):
+        # Dashed dividers beat against themselves once elements are a few px
+        # wide (moire on a sds[61] at 0.5 px/byte); solid at low opacity reads
+        # as a slot texture at every scale. Pin both the presentation
+        # attribute and the <style> rule, since non-browser rasterizers only
+        # honor the former.
+        from fieldday.cparse import parse_snippet
+        from fieldday.probe import compute_layouts
+        sl = compute_layouts(parse_snippet("struct s { int x[5]; int tail; };"))[0]
+        svg = render_struct(sl, RenderOptions())
+        style, body = svg.split("</style>")
+        assert "stroke-dasharray" not in style.split(".fd-subdivision-line")[1].split("}")[0]
+        line = re.search(r'<line class="fd-subdivision-line"[^>]*>', body).group(0)
+        assert "stroke-dasharray" not in line and 'opacity="0.25"' in line
+
     def test_array_dividers_omitted_when_packed_below_min_px(self):
         # A char[254] at 0.33 px/byte would draw 253 dividers 0.33 px apart:
         # they fuse into a solid stripe that hides the field color. Below
@@ -243,10 +258,10 @@ class TestAnnotations:
         from fieldday.probe import compute_layouts
         sl = compute_layouts(parse_snippet("struct s { char pfx[254]; uint64_t counts[61]; long t; };"))[0]
         svg = render_struct(sl, RenderOptions(px_per_byte=0.33, cache_line=0))
-        # counts: 8 B * 0.33 = 2.64 px < 3 -> also omitted
+        # counts: 8 B * 0.33 = 2.64 px < 4 -> also omitted
         assert svg.count('class="fd-subdivision-line"') == 0
         svg = render_struct(sl, RenderOptions(px_per_byte=0.5, cache_line=0))
-        # pfx: 0.5 px < 3 -> omitted; counts: 4 px >= 3 -> 60 dividers
+        # pfx: 0.5 px < 4 -> omitted; counts: 4 px >= 4 -> 60 dividers
         assert svg.count('class="fd-subdivision-line"') == 60
         svg = render_struct(sl, RenderOptions(px_per_byte=0.33, cache_line=0, min_divider_px=0))
         assert svg.count('class="fd-subdivision-line"') == 253 + 60
