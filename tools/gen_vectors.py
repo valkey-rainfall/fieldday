@@ -56,6 +56,12 @@ CORPUS = {
         struct outer { int x; struct inner in; };
     """,
     "typedef_struct": "typedef struct { int a; char b; } tiny;",
+    "typedef_name_as_field_type": """
+        typedef struct node { bool is_leaf; uint8_t num_items; } node;
+        typedef struct leafNode { node header; struct leafNode *prev; sds values[3]; } leafNode;
+    """,
+    "bool_field": "struct p { bool flag; long l; };",
+    "stddef_types": "struct p { char c; size_t n; ptrdiff_t d; };",
     "flexible_array_member": """
         typedef struct node {
             sds ele;

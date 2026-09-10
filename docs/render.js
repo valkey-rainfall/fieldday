@@ -65,7 +65,8 @@ export function defaultOptions() {
     fontSize: 15,          // inline labels
     calloutFontSize: 12,
     ruler: true,           // byte ruler below the bar
-    rulerStep: 8,
+    rulerStep: 0,          // bytes between labeled ticks; 0 = auto from pxPerByte
+    minDividerPx: 3.0,     // hide array/nested dividers packed tighter than this
     cacheLine: 64,         // heavy tick every N bytes (0 disables)
     jemallocSlack: false,  // show size-class round-up waste per allocation
     paddingCallout: false, // opt-in "N of M bytes are padding" line
@@ -273,13 +274,21 @@ function esc(s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-// Match Python's f"{x:.1f}" (round-half-even) so both renderers emit
-// byte-identical geometry.
+// Match Python's f"{x:.1f}" so both renderers emit byte-identical geometry.
+// Python rounds the EXACT binary value of the double, and so does toFixed
+// (ECMA-262 Number.prototype.toFixed: "n / 10^f - x as close to zero as
+// possible"). They differ only on an exact tie, where Python picks the even
+// digit and toFixed picks the larger. A double is an exact tie at one
+// decimal only when its fraction is exactly .25 or .75 (x*4 integral, x*2
+// not) -- testing `x*10 - floor(x*10) == 0.5` instead misfires on values
+// like 698.85, whose double is 698.85000000000002 and must round UP.
 function f1(x) {
-  const v = x * 10;
-  let r = Math.round(v);
-  if (Math.abs(v - Math.floor(v) - 0.5) < 1e-9) r = 2 * Math.round(v / 2);
-  const out = r / 10;
+  let out;
+  if (Number.isInteger(x * 4) && !Number.isInteger(x * 2)) {
+    out = (2 * Math.round(x * 10 / 2)) / 10;      // half-even on a true tie
+  } else {
+    out = Number(x.toFixed(1));
+  }
   return (Object.is(out, -0) ? 0 : out).toFixed(1);
 }
 
@@ -436,10 +445,20 @@ export function renderStruct(sl, userOpts = {}) {
     } else cls = "fd-field-box";
     parts.push(`<rect class="${cls}" x="${f1(x)}" y="${f1(barTop)}" ` +
       `width="${f1(w)}" height="${opts.barHeight}" rx="${opts.cornerRadius}"/>`);
-    for (const db of seg.dividersBits || []) {
-      const dx = x + db / 8 * ppb;
-      parts.push(`<line class="fd-subdivision-line" x1="${f1(dx)}" y1="${f1(barTop + 3)}" ` +
-        `x2="${f1(dx)}" y2="${f1(barTop + opts.barHeight - 3)}"/>`);
+    // Internal boundaries are only legible when elements are a few pixels
+    // wide. Below that (a char[254] at 0.3 px/byte) the lines fuse into a
+    // solid stripe and hide the field color, so draw none.
+    const divs = seg.dividersBits || [];
+    if (divs.length) {
+      let spacing = Infinity, prev = 0;
+      for (const db of divs) { spacing = Math.min(spacing, db - prev); prev = db; }
+      if (spacing / 8 * ppb >= opts.minDividerPx) {
+        for (const db of divs) {
+          const dx = x + db / 8 * ppb;
+          parts.push(`<line class="fd-subdivision-line" x1="${f1(dx)}" y1="${f1(barTop + 3)}" ` +
+            `x2="${f1(dx)}" y2="${f1(barTop + opts.barHeight - 3)}"/>`);
+        }
+      }
     }
   }
   // cache-line boundaries: bold dashed rules cutting through the bar
@@ -497,10 +516,18 @@ export function renderStruct(sl, userOpts = {}) {
         parts.push(textEl(x, ry + 20, String(labelBase + b), 11, lblcls, "middle", weight));
       };
       const cl = opts.cacheLine;
-      for (let b = 0; b <= nBytes; b += opts.rulerStep) {
+      // Pick the tick step so labels do not overprint: an 11px label of
+      // up to four digits needs ~36px. rulerStep=0 means "auto".
+      let step = opts.rulerStep;
+      if (!step) {
+        step = 8;
+        while (step * ppb < 36 && step < nBytes) step *= 2;
+      }
+      for (let b = 0; b <= nBytes; b += step) {
         if (!(cl && b && b % cl === 0)) tick(b, "fd-ruler-line", 6, "fd-ruler-label", "600");
       }
-      if (nBytes % opts.rulerStep !== 0 && !(cl && nBytes % cl === 0)) {
+      // trailing end tick, unless it would sit on top of the last label
+      if (nBytes % step !== 0 && !(cl && nBytes % cl === 0) && (nBytes % step) * ppb >= 36) {
         tick(nBytes, "fd-ruler-line", 6, "fd-ruler-label", "600");
       }
       // cache-line boundaries: bold label; the rule itself is the

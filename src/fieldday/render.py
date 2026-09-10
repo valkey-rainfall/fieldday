@@ -72,7 +72,8 @@ class RenderOptions:
     font_size: int = 15          # inline labels
     callout_font_size: int = 12
     ruler: bool = True           # byte ruler below the bar
-    ruler_step: int = 8
+    ruler_step: int = 0           # bytes between labeled ticks; 0 = auto from px-per-byte
+    min_divider_px: float = 3.0   # hide array/nested dividers packed tighter than this
     cache_line: int = 64          # heavy tick every N bytes (0 disables)
     jemalloc_slack: bool = False  # show size-class round-up waste per allocation
     padding_callout: bool = False  # opt-in "N of M bytes are padding" line
@@ -443,10 +444,16 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
             cls = "fd-field-box"
         parts.append(f'<rect class="{cls}" x="{x:.1f}" y="{bar_top:.1f}" '
                      f'width="{w:.1f}" height="{opts.bar_height}" rx="{opts.corner_radius}"/>')
-        for db in seg.dividers_bits:
-            dx = x + db / 8 * ppb
-            parts.append(f'<line class="fd-subdivision-line" x1="{dx:.1f}" y1="{bar_top + 3:.1f}" '
-                         f'x2="{dx:.1f}" y2="{bar_top + opts.bar_height - 3:.1f}"/>')
+        # Internal boundaries are only legible when elements are a few pixels
+        # wide. Below that (a char[254] at 0.3 px/byte) the lines fuse into a
+        # solid stripe and hide the field color, so draw none.
+        if seg.dividers_bits:
+            spacing = min(b - a for a, b in zip((0,) + seg.dividers_bits[:-1], seg.dividers_bits))
+            if spacing / 8 * ppb >= opts.min_divider_px:
+                for db in seg.dividers_bits:
+                    dx = x + db / 8 * ppb
+                    parts.append(f'<line class="fd-subdivision-line" x1="{dx:.1f}" y1="{bar_top + 3:.1f}" '
+                                 f'x2="{dx:.1f}" y2="{bar_top + opts.bar_height - 3:.1f}"/>')
     # cache-line boundaries: bold dashed rules cutting through the bar
     # (and down to the ruler when present), per allocation
     if opts.cache_line:
@@ -503,12 +510,21 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
                                    weight=weight))
 
             cl = opts.cache_line
+            # Pick the tick step so labels do not overprint: an 11px label of
+            # up to four digits needs ~36px. ruler_step=0 means "auto".
+            step = opts.ruler_step
+            if not step:
+                step = 8
+                while step * ppb < 36 and step < n_bytes:
+                    step *= 2
             b = 0
             while b <= n_bytes:
                 if not (cl and b and b % cl == 0):
                     tick(b, "fd-ruler-line", 6, "fd-ruler-label", "600")
-                b += opts.ruler_step
-            if n_bytes % opts.ruler_step != 0 and not (cl and n_bytes % cl == 0):
+                b += step
+            # trailing end tick, unless it would sit on top of the last label
+            if n_bytes % step != 0 and not (cl and n_bytes % cl == 0) \
+                    and (n_bytes % step) * ppb >= 36:
                 tick(n_bytes, "fd-ruler-line", 6, "fd-ruler-label", "600")
             # cache-line boundaries: bold label; the rule itself is the
             # full-height overlay drawn through the bar

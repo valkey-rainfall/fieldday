@@ -40,6 +40,11 @@ BUILTIN_STUBS = {
 
 STUB_RE = re.compile(r"^\s*//@\s*stub\s+(\w+)\s+(\d+)(?:\s+(\d+))?\s*$", re.M)
 
+# Names the probe program's own #includes (<stddef.h> via <stdio.h>) already
+# define. Stubbing them in the probe source is a redefinition error, so they
+# are stubbed for pycparser only and the compiler's real type is used.
+PROBE_HEADER_TYPES = {"size_t", "ptrdiff_t"}
+
 
 @dataclass
 class FieldDecl:
@@ -170,13 +175,41 @@ def _field_from_decl(decl, snippet_struct_names: set[str]) -> FieldDecl:
                      struct_ref=struct_ref)
 
 
+def _snippet_typedef_names(text: str) -> set[str]:
+    """Names introduced by 'typedef ... NAME;' in the snippet, including
+    typedefs whose declarator carries a brace body ('typedef struct { ... } t;').
+    A naive regex stops at the first ';' inside the body and captures a field
+    name instead, so track brace depth and take the identifier that precedes
+    the terminating ';' at depth 0."""
+    names: set[str] = set()
+    for m in re.finditer(r"\btypedef\b", text):
+        depth = 0
+        i = m.end()
+        while i < len(text):
+            c = text[i]
+            if c == "{":
+                depth += 1
+            elif c == "}":
+                depth -= 1
+            elif c == ";" and depth == 0:
+                break
+            i += 1
+        decl = text[m.end():i]
+        # strip trailing array dims: 'typedef uint64_t iter[3];'
+        decl = re.sub(r"(\[[^\]]*\]\s*)+$", "", decl.rstrip())
+        tail = re.search(r"(\w+)\s*$", decl)
+        if tail:
+            names.add(tail.group(1))
+    return names
+
+
 def parse_snippet(text: str) -> Snippet:
     """Parse a C snippet containing one or more struct definitions."""
     user_stubs = _collect_stub_directives(text)
     clean = _strip_comments(text)
 
     # Names already known: builtin stubs, user stubs, snippet typedefs
-    snippet_typedefs = set(re.findall(r"typedef\s+[^;]+?(\w+)\s*;", clean))
+    snippet_typedefs = _snippet_typedef_names(clean)
     known = set(BUILTIN_STUBS) | set(user_stubs) | snippet_typedefs
 
     unknown = _find_unknown_typedefs(clean, known)
@@ -189,6 +222,12 @@ def parse_snippet(text: str) -> Snippet:
     prelude_lines = []
     probe_prelude_lines = []
     used_stubs: dict[str, tuple[int, int]] = {}
+    # 'bool' is a <stdbool.h> macro, not a keyword: neither pycparser nor the
+    # header-less probe program knows it. Alias it to the real C99 type so it
+    # lays out as the compiler's _Bool rather than as a char[1] stub.
+    if "bool" in referenced and "bool" not in snippet_typedefs and "bool" not in user_stubs:
+        prelude_lines.append("typedef _Bool bool;")
+        probe_prelude_lines.append("typedef _Bool bool;")
     for name in sorted(known | set(unknown)):
         if name in snippet_typedefs or name in keywords or name not in referenced:
             continue
@@ -203,6 +242,10 @@ def parse_snippet(text: str) -> Snippet:
         used_stubs[name] = (size, align)
         # pycparser can't handle _Alignas; the probe compiler can.
         prelude_lines.append(f"typedef char {name}[{size}];")
+        if name in PROBE_HEADER_TYPES and name not in user_stubs:
+            # The probe program includes <stddef.h>, which already defines
+            # these; a stub typedef would conflict. Let the real type through.
+            continue
         probe_prelude_lines.append(
             f"typedef struct {{ _Alignas({align}) unsigned char _b[{size}]; }} {name};")
 
