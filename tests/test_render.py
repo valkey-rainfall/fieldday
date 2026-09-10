@@ -234,6 +234,54 @@ class TestAnnotations:
         svg = render_struct(sl, RenderOptions())
         assert svg.count('class="fd-subdivision-line"') == 4  # 5 elements -> 4 dividers
 
+    def test_array_dividers_omitted_when_packed_below_min_px(self):
+        # A char[254] at 0.33 px/byte would draw 253 dividers 0.33 px apart:
+        # they fuse into a solid stripe that hides the field color. Below
+        # min_divider_px no dividers are drawn; a wider array on the same
+        # struct keeps its dividers.
+        from fieldday.cparse import parse_snippet
+        from fieldday.probe import compute_layouts
+        sl = compute_layouts(parse_snippet("struct s { char pfx[254]; uint64_t counts[61]; long t; };"))[0]
+        svg = render_struct(sl, RenderOptions(px_per_byte=0.33, cache_line=0))
+        # counts: 8 B * 0.33 = 2.64 px < 3 -> also omitted
+        assert svg.count('class="fd-subdivision-line"') == 0
+        svg = render_struct(sl, RenderOptions(px_per_byte=0.5, cache_line=0))
+        # pfx: 0.5 px < 3 -> omitted; counts: 4 px >= 3 -> 60 dividers
+        assert svg.count('class="fd-subdivision-line"') == 60
+        svg = render_struct(sl, RenderOptions(px_per_byte=0.33, cache_line=0, min_divider_px=0))
+        assert svg.count('class="fd-subdivision-line"') == 253 + 60
+
+    def test_ruler_step_auto_widens_at_low_px_per_byte(self):
+        # At the default 15 px/byte an 8-byte step keeps labels 120 px apart,
+        # so auto resolves to 8 and the ruler is unchanged. At 0.33 px/byte
+        # an 8-byte step would stack labels 2.6 px apart; auto doubles the
+        # step until labels have ~36 px, and the trailing end tick is dropped
+        # when it would overprint the last label.
+        from fieldday.cparse import parse_snippet
+        from fieldday.probe import compute_layouts
+        sl = compute_layouts(parse_snippet("struct s { char buf[2048]; };"))[0]
+        labels = lambda svg: [int(x) for x in re.findall(r'class="fd-ruler-label"[^>]*>(\d+)<', svg)]
+        wide = labels(render_struct(sl, RenderOptions(cache_line=0)))
+        assert wide[:3] == [0, 8, 16] and wide[-1] == 2048
+        narrow = labels(render_struct(sl, RenderOptions(px_per_byte=0.33, cache_line=0)))
+        assert narrow[:3] == [0, 128, 256] and narrow[-1] == 2048  # 128 * 0.33 = 42 px
+        assert all(b - a == 128 for a, b in zip(narrow, narrow[1:]))
+        # explicit step still wins over auto
+        forced = labels(render_struct(sl, RenderOptions(px_per_byte=0.33, cache_line=0, ruler_step=512)))
+        assert forced == [0, 512, 1024, 1536, 2048]
+
+    def test_ruler_end_tick_dropped_when_it_would_overprint(self):
+        from fieldday.cparse import parse_snippet
+        from fieldday.probe import compute_layouts
+        # 100 B at 1 px/byte: auto step 64 (64 px >= 36). The end tick at 100
+        # would sit 36 px past the 64 label -- exactly the threshold, so kept.
+        sl = compute_layouts(parse_snippet("struct s { char buf[100]; };"))[0]
+        labels = lambda svg: [int(x) for x in re.findall(r'class="fd-ruler-label"[^>]*>(\d+)<', svg)]
+        assert labels(render_struct(sl, RenderOptions(px_per_byte=1.0, cache_line=0))) == [0, 64, 100]
+        # 90 B: end tick 26 px past the 64 label -> dropped rather than overprinted.
+        sl = compute_layouts(parse_snippet("struct s { char buf[90]; };"))[0]
+        assert labels(render_struct(sl, RenderOptions(px_per_byte=1.0, cache_line=0))) == [0, 64]
+
     def test_relabel_and_hide(self):
         from fieldday.cparse import parse_snippet
         from fieldday.probe import compute_layouts
