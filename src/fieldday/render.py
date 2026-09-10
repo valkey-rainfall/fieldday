@@ -13,7 +13,7 @@ defaults; inlined into a page, the page's --fd-* variables win.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from .probe import StructLayout, FieldLayout
@@ -61,8 +61,16 @@ DEFAULT_THEME = {
     "padding-stroke": "#b9c2cc",
     "field-border": "#30176e",
     "highlight": "#1e8e3e",
+    # role fills: what the bytes are *for*. Pointers orange, other
+    # bookkeeping slate, user data brand blue (same as field-fill so a
+    # role-colored bar reads as "the plain bar, with overhead called out").
+    "role-pointer": "#e07b39",
+    "role-overhead": "#9aa7b5",
+    "role-data": "#6983ff",
     "font": "'Fira Mono', Consolas, Menlo, Monaco, 'Courier New', monospace",
 }
+
+ROLES = ("pointer", "overhead", "data")  # plus 'none' to force the neutral fill
 
 
 @dataclass
@@ -85,6 +93,11 @@ class RenderOptions:
     extra_css: str = ""           # user CSS appended inside the <style> block
     corner_radius: int = 4
     margin: int = 24
+    bare: bool = False            # just the bar: no title, labels, ruler, cache
+                                  # lines, notes, arrows, margins or background.
+                                  # The SVG is exactly bar_height tall and
+                                  # end_bytes * px_per_byte wide, so a composer
+                                  # nesting it knows slot x = offset * px_per_byte.
 
 
 # ---------------------------------------------------------------- segments
@@ -102,6 +115,7 @@ class Segment:
     is_extra: bool = False       # hand-annotated companion allocation
     extra_kind: str = "embedded"  # embedded (same alloc) | separate (own alloc)
     dividers_bits: tuple = ()     # light internal boundaries, relative bits
+    role: str | None = None       # pointer | overhead | data; None = neutral fill
 
     @property
     def bytes_str(self) -> str:
@@ -110,12 +124,33 @@ class Segment:
         return f"{self.width_bits}b"
 
 
+def field_role(f: FieldLayout, roles: dict) -> str | None:
+    """Role for a member's box. Roles are opt-in: with an empty map every
+    box keeps the neutral fill (so existing diagrams are unchanged). Once
+    any role is set, pointer members default to 'pointer' and an explicit
+    entry overrides that ('none' forces neutral)."""
+    if not roles or f.is_padding:
+        return None
+    role = roles.get(f.name)
+    if role is None:
+        return "pointer" if f.is_pointer else None
+    if role == "none":
+        return None
+    if role not in ROLES:
+        raise ValueError(
+            f"unknown role {role!r} for member {f.name!r} "
+            f"(expected one of: {', '.join(ROLES)}, none)")
+    return role
+
+
 def segments_from_layout(sl: StructLayout, opts: RenderOptions) -> list[Segment]:
     relabel = sl.relabel or {}
+    roles = sl.roles or {}
     segs: list[Segment] = []
     for f in sl.fields:
         # manual relabel: custom label used verbatim; '' hides the label
         custom = relabel.get(f.name) if not f.is_padding else None
+        role = field_role(f, roles)
         if f.bit_offset is not None:
             label = f.name
             if opts.show_bit_widths and f.bit_width:
@@ -123,7 +158,7 @@ def segments_from_layout(sl: StructLayout, opts: RenderOptions) -> list[Segment]
             if custom is not None:
                 label = custom
             segs.append(Segment(label, f.bit_offset, f.bit_width or 0,
-                                is_bitfield=True))
+                                is_bitfield=True, role=role))
         elif f.size == 0 and not f.is_padding:
             # flexible array member: nominal 1-byte box dangling past the end
             label = f.name + "[]" if custom is None else custom
@@ -134,7 +169,7 @@ def segments_from_layout(sl: StructLayout, opts: RenderOptions) -> list[Segment]
                 name = custom
             segs.append(Segment("padding-fill" if f.is_padding else name,
                                 f.offset * 8, f.size * 8,
-                                is_padding=f.is_padding,
+                                is_padding=f.is_padding, role=role,
                                 dividers_bits=tuple(d * 8 for d in (f.dividers or ()))))
     # fill sub-byte gaps (bitfield allocation-unit padding) with hatched
     # padding at bit precision -- the layout model's pad fields are byte-
@@ -310,6 +345,9 @@ def _presentation_attrs(theme: dict) -> dict:
         "fd-background": f'fill="{t["background"]}"',
         "fd-title": f'fill="{t["text"]}" font-family="{font}"',
         "fd-field-box": f'fill="{t["field-fill"]}" stroke="{t["field-border"]}" stroke-width="1"',
+        "fd-role-pointer": f'fill="{t["role-pointer"]}" stroke="{t["field-border"]}" stroke-width="1"',
+        "fd-role-overhead": f'fill="{t["role-overhead"]}" stroke="{t["field-border"]}" stroke-width="1"',
+        "fd-role-data": f'fill="{t["role-data"]}" stroke="{t["field-border"]}" stroke-width="1"',
         "fd-padding-box": f'fill="url(#fd-hatch)" stroke="{t["padding-stroke"]}" stroke-width="1"',
         "fd-flexible-array": f'fill="none" stroke="{t["muted"]}" stroke-width="1" stroke-dasharray="4 3"',
         "fd-extra-box": f'fill="{t["field-fill"]}" fill-opacity="0.55" stroke="{t["field-border"]}" stroke-width="1" stroke-dasharray="5 3"',
@@ -347,6 +385,9 @@ def _style_block(theme: dict, extra_css: str = "") -> str:
   .fd-background      {{ fill: {t['background']}; fill: var(--fd-background, {t['background']}); }}
   .fd-title   {{ fill: {t['text']}; fill: var(--fd-text, {t['text']}); }}
   .fd-field-box   {{ fill: {t['field-fill']}; fill: var(--fd-field-fill, {t['field-fill']}); stroke: {t['field-border']}; stroke: var(--fd-field-border, {t['field-border']}); stroke-width: 1; }}
+  .fd-role-pointer   {{ fill: {t['role-pointer']}; fill: var(--fd-role-pointer, {t['role-pointer']}); stroke: {t['field-border']}; stroke: var(--fd-field-border, {t['field-border']}); stroke-width: 1; }}
+  .fd-role-overhead   {{ fill: {t['role-overhead']}; fill: var(--fd-role-overhead, {t['role-overhead']}); stroke: {t['field-border']}; stroke: var(--fd-field-border, {t['field-border']}); stroke-width: 1; }}
+  .fd-role-data   {{ fill: {t['role-data']}; fill: var(--fd-role-data, {t['role-data']}); stroke: {t['field-border']}; stroke: var(--fd-field-border, {t['field-border']}); stroke-width: 1; }}
   .fd-padding-box     {{ fill: url(#fd-hatch); stroke: {t['padding-stroke']}; stroke: var(--fd-padding-stroke, {t['padding-stroke']}); stroke-width: 1; }}
   .fd-flexible-array    {{ fill: none; stroke: {t['muted']}; stroke: var(--fd-muted, {t['muted']}); stroke-width: 1; stroke-dasharray: 4 3; }}
   .fd-extra-box   {{ fill: {t['field-fill']}; fill: var(--fd-field-fill, {t['field-fill']}); fill-opacity: 0.55; stroke: {t['field-border']}; stroke: var(--fd-field-border, {t['field-border']}); stroke-width: 1; stroke-dasharray: 5 3; }}
@@ -385,6 +426,11 @@ def _text(x, y, s, size, cls, anchor="middle", weight="600"):
 
 def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
     opts = opts or RenderOptions()
+    if opts.bare:
+        # bare = the bar alone. Everything that is not a box is dropped and
+        # the margin goes to zero, so x = offset * px_per_byte exactly.
+        opts = replace(opts, title="", ruler=False, cache_line=0, margin=0,
+                       transparent=True, padding_callout=False)
     ppb = opts.px_per_byte
     m = opts.margin
     x0 = m
@@ -393,11 +439,13 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
     total_px = end_bits / 8 * ppb
 
     inline, callouts, runs = plan_labels(segs, opts, x0)
+    if opts.bare:
+        inline, callouts, runs = [], [], []
 
     # vertical budget
     title = opts.title if opts.title is not None else \
         (sl.title or f"struct {sl.name}")
-    cy = m + 4
+    cy = 0 if opts.bare else m + 4
     parts: list[str] = []
     if title:
         parts.append(_text(x0, cy + 10, title, 15, "fd-title", "start", "700"))
@@ -436,10 +484,12 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
             cls = "fd-flexible-array"
         elif seg.is_extra:
             cls = "fd-extra-box"
-            if seg.extra_kind == "separate":
+            if seg.extra_kind == "separate" and not opts.bare:
                 gap_px = sep_gap_bits(opts) / 8 * ppb
                 parts.append(_text(x - gap_px / 2, bar_top + opts.bar_height / 2 + 5,
                                    "+", 17, "fd-allocation-plus", weight="700"))
+        elif seg.role:
+            cls = f"fd-role-{seg.role}"
         else:
             cls = "fd-field-box"
         parts.append(f'<rect class="{cls}" x="{x:.1f}" y="{bar_top:.1f}" '
@@ -544,7 +594,7 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
 
     # pointer arrows: from a member's box down below the ruler, across,
     # and up into the start of the target member/extra (arrowhead up)
-    if sl.arrows:
+    if sl.arrows and not opts.bare:
         centers = {}
         starts = {}
         for f in sl.fields:
@@ -598,7 +648,7 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
 
     # hand-annotated note: neutral by default; the savings style opts into
     # the green decrease glyph (only right when the note describes a saving)
-    if sl.note:
+    if sl.note and not opts.bare:
         if getattr(sl, "note_style", "plain") == "savings":
             text, cls, weight = f"\u25bc {sl.note}", "fd-note", "700"
         else:

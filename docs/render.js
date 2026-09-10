@@ -43,8 +43,16 @@ export const DEFAULT_THEME = {
   "padding-stroke": "#b9c2cc",
   "field-border": "#30176e",
   "highlight": "#1e8e3e",
+  // role fills: what the bytes are *for*. Pointers orange, other
+  // bookkeeping slate, user data brand blue (same as field-fill so a
+  // role-colored bar reads as "the plain bar, with overhead called out").
+  "role-pointer": "#e07b39",
+  "role-overhead": "#9aa7b5",
+  "role-data": "#6983ff",
   "font": "'Fira Mono', Consolas, Menlo, Monaco, 'Courier New', monospace",
 };
+
+export const ROLES = ["pointer", "overhead", "data"]; // plus 'none' to force the neutral fill
 
 export const THEMES = {
   valkey: {},
@@ -54,6 +62,7 @@ export const THEMES = {
     "field-fill": "#7fb3e0", "field-text": "#16213e",
     "padding-fill": "#2a2a3e", "padding-stroke": "#555568",
     "field-border": "#444444", "highlight": "#e0b97f",
+    "role-pointer": "#e09a5c", "role-overhead": "#6c7a89", "role-data": "#7fb3e0",
     "font": "ui-monospace, SFMono-Regular, 'Cascadia Code', monospace",
   },
 };
@@ -78,6 +87,11 @@ export function defaultOptions() {
     extraCss: "",          // user CSS appended inside the <style> block
     cornerRadius: 4,
     margin: 24,
+    bare: false,           // just the bar: no title, labels, ruler, cache lines,
+                           // notes, arrows, margins or background. The SVG is
+                           // exactly barHeight tall and endBytes * pxPerByte
+                           // wide, so a composer nesting it knows slot
+                           // x = offset * pxPerByte.
   };
 }
 
@@ -87,18 +101,36 @@ function paddingBytes(sl) {
   return sl.fields.reduce((n, f) => n + (f.is_padding ? f.size : 0), 0);
 }
 
+/** Role for a member's box. Roles are opt-in: with an empty map every box
+ *  keeps the neutral fill (so existing diagrams are unchanged). Once any
+ *  role is set, pointer members default to 'pointer' and an explicit entry
+ *  overrides that ('none' forces neutral). */
+export function fieldRole(f, roles) {
+  if (!roles || !Object.keys(roles).length || f.is_padding) return null;
+  const role = roles[f.name];
+  if (role === undefined || role === null) return f.is_pointer ? "pointer" : null;
+  if (role === "none") return null;
+  if (!ROLES.includes(role)) {
+    throw new Error(`unknown role '${role}' for member '${f.name}' ` +
+      `(expected one of: ${ROLES.join(", ")}, none)`);
+  }
+  return role;
+}
+
 function segmentsFromLayout(sl, opts) {
   const relabel = sl.relabel || {};
+  const roles = sl.roles || {};
   let segs = [];
   for (const f of sl.fields) {
     // manual relabel: custom label used verbatim; '' hides the label
     const custom = f.is_padding ? undefined : relabel[f.name];
+    const role = fieldRole(f, roles);
     if (f.bit_offset !== undefined && f.bit_offset !== null) {
       let label = f.name;
       if (opts.showBitWidths && f.bit_width) label = `${f.name}:${f.bit_width}`;
       if (custom !== undefined) label = custom;
       segs.push({ label, startBits: f.bit_offset, widthBits: f.bit_width || 0,
-                  isBitfield: true });
+                  isBitfield: true, role });
     } else if (f.size === 0 && !f.is_padding) {
       // flexible array member: nominal 1-byte box dangling past the end
       const label = custom !== undefined ? custom : f.name + "[]";
@@ -109,7 +141,7 @@ function segmentsFromLayout(sl, opts) {
       if (custom !== undefined) name = custom;
       segs.push({ label: f.is_padding ? "padding-fill" : name,
                   startBits: f.offset * 8, widthBits: f.size * 8,
-                  isPadding: !!f.is_padding,
+                  isPadding: !!f.is_padding, role,
                   dividersBits: (f.dividers || []).map((d) => d * 8) });
     }
   }
@@ -304,6 +336,9 @@ function presentationAttrs(theme) {
     "fd-background": `fill="${t["background"]}"`,
     "fd-title": `fill="${t["text"]}" font-family="${font}"`,
     "fd-field-box": `fill="${t["field-fill"]}" stroke="${t["field-border"]}" stroke-width="1"`,
+    "fd-role-pointer": `fill="${t["role-pointer"]}" stroke="${t["field-border"]}" stroke-width="1"`,
+    "fd-role-overhead": `fill="${t["role-overhead"]}" stroke="${t["field-border"]}" stroke-width="1"`,
+    "fd-role-data": `fill="${t["role-data"]}" stroke="${t["field-border"]}" stroke-width="1"`,
     "fd-padding-box": `fill="url(#fd-hatch)" stroke="${t["padding-stroke"]}" stroke-width="1"`,
     "fd-flexible-array": `fill="none" stroke="${t["muted"]}" stroke-width="1" stroke-dasharray="4 3"`,
     "fd-extra-box": `fill="${t["field-fill"]}" fill-opacity="0.55" stroke="${t["field-border"]}" stroke-width="1" stroke-dasharray="5 3"`,
@@ -342,6 +377,9 @@ function styleBlock(theme, extraCss = "") {
   .fd-background      { fill: ${t["background"]}; fill: var(--fd-background, ${t["background"]}); }
   .fd-title   { fill: ${t["text"]}; fill: var(--fd-text, ${t["text"]}); }
   .fd-field-box   { fill: ${t["field-fill"]}; fill: var(--fd-field-fill, ${t["field-fill"]}); stroke: ${t["field-border"]}; stroke: var(--fd-field-border, ${t["field-border"]}); stroke-width: 1; }
+  .fd-role-pointer   { fill: ${t["role-pointer"]}; fill: var(--fd-role-pointer, ${t["role-pointer"]}); stroke: ${t["field-border"]}; stroke: var(--fd-field-border, ${t["field-border"]}); stroke-width: 1; }
+  .fd-role-overhead   { fill: ${t["role-overhead"]}; fill: var(--fd-role-overhead, ${t["role-overhead"]}); stroke: ${t["field-border"]}; stroke: var(--fd-field-border, ${t["field-border"]}); stroke-width: 1; }
+  .fd-role-data   { fill: ${t["role-data"]}; fill: var(--fd-role-data, ${t["role-data"]}); stroke: ${t["field-border"]}; stroke: var(--fd-field-border, ${t["field-border"]}); stroke-width: 1; }
   .fd-padding-box     { fill: url(#fd-hatch); stroke: ${t["padding-stroke"]}; stroke: var(--fd-padding-stroke, ${t["padding-stroke"]}); stroke-width: 1; }
   .fd-flexible-array    { fill: none; stroke: ${t["muted"]}; stroke: var(--fd-muted, ${t["muted"]}); stroke-width: 1; stroke-dasharray: 4 3; }
   .fd-extra-box   { fill: ${t["field-fill"]}; fill: var(--fd-field-fill, ${t["field-fill"]}); fill-opacity: 0.55; stroke: ${t["field-border"]}; stroke: var(--fd-field-border, ${t["field-border"]}); stroke-width: 1; stroke-dasharray: 5 3; }
@@ -381,7 +419,13 @@ function textEl(x, y, s, size, cls, anchor = "middle", weight = "600") {
  *  `sl` is one element of computeLayouts() output, optionally carrying
  *  `title`, `extras` [{label, bytes, kind}], and `note` annotations. */
 export function renderStruct(sl, userOpts = {}) {
-  const opts = { ...defaultOptions(), ...userOpts };
+  let opts = { ...defaultOptions(), ...userOpts };
+  if (opts.bare) {
+    // bare = the bar alone. Everything that is not a box is dropped and
+    // the margin goes to zero, so x = offset * pxPerByte exactly.
+    opts = { ...opts, title: "", ruler: false, cacheLine: 0, margin: 0,
+             transparent: true, paddingCallout: false };
+  }
   const ppb = opts.pxPerByte;
   const m = opts.margin;
   const x0 = m;
@@ -389,11 +433,12 @@ export function renderStruct(sl, userOpts = {}) {
   const endBits = Math.max(sl.size * 8, ...segs.map((g) => g.startBits + g.widthBits));
   const totalPx = endBits / 8 * ppb;
 
-  const [inline, callouts, runs] = planLabels(segs, opts, x0);
+  let [inline, callouts, runs] = planLabels(segs, opts, x0);
+  if (opts.bare) { inline = []; callouts = []; runs = []; }
 
   const title = opts.title !== null && opts.title !== undefined
     ? opts.title : (sl.title || `struct ${sl.name}`);
-  let cy = m + 4;
+  let cy = opts.bare ? 0 : m + 4;
   const parts = [];
   if (title) {
     parts.push(textEl(x0, cy + 10, title, 15, "fd-title", "start", "700"));
@@ -437,12 +482,13 @@ export function renderStruct(sl, userOpts = {}) {
     else if (seg.isFlex) cls = "fd-flexible-array";
     else if (seg.isExtra) {
       cls = "fd-extra-box";
-      if (seg.extraKind === "separate") {
+      if (seg.extraKind === "separate" && !opts.bare) {
         const gapPx = sepGapBits(opts) / 8 * ppb;
         parts.push(textEl(x - gapPx / 2, barTop + opts.barHeight / 2 + 5,
                           "+", 17, "fd-allocation-plus", "middle", "700"));
       }
-    } else cls = "fd-field-box";
+    } else if (seg.role) cls = `fd-role-${seg.role}`;
+    else cls = "fd-field-box";
     parts.push(`<rect class="${cls}" x="${f1(x)}" y="${f1(barTop)}" ` +
       `width="${f1(w)}" height="${opts.barHeight}" rx="${opts.cornerRadius}"/>`);
     // Internal boundaries are thin solid lines at low opacity: dashes beat
@@ -547,7 +593,7 @@ export function renderStruct(sl, userOpts = {}) {
 
   // pointer arrows: from a member's box down below the ruler, across,
   // and up into the start of the target member/extra (arrowhead up)
-  if (sl.arrows && sl.arrows.length) {
+  if (sl.arrows && sl.arrows.length && !opts.bare) {
     const centers = {};
     const starts = {};
     for (const f of sl.fields) {
@@ -609,7 +655,7 @@ export function renderStruct(sl, userOpts = {}) {
 
   // hand-annotated note: neutral by default; the savings style opts into
   // the green decrease glyph (only right when the note describes a saving)
-  if (sl.note) {
+  if (sl.note && !opts.bare) {
     const savings = sl.note_style === "savings";
     const text = savings ? `\u25bc ${sl.note}` : sl.note;
     wrapText(text, 13, noteWrapPx).forEach((line, i) => {

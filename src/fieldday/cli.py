@@ -35,6 +35,7 @@ BUILTIN_THEMES = {
         "field-fill": "#7fb3e0", "field-text": "#16213e",
         "padding-fill": "#2a2a3e", "padding-stroke": "#555568",
         "field-border": "#444444", "highlight": "#e0b97f",
+        "role-pointer": "#e09a5c", "role-overhead": "#6c7a89", "role-data": "#7fb3e0",
         "font": "ui-monospace, SFMono-Regular, 'Cascadia Code', monospace",
     },
 }
@@ -63,7 +64,7 @@ def layouts_from_json(text: str) -> list[StructLayout]:
                           extras=s.get("extras", []), note=s.get("note"),
                           note_style=s.get("note_style", "plain"),
                           title=s.get("title"), relabel=s.get("relabel", {}),
-                          arrows=s.get("arrows", []))
+                          arrows=s.get("arrows", []), roles=s.get("roles", {}))
         for f in s["fields"]:
             sl.fields.append(FieldLayout(
                 name=f["name"], type_str=f.get("type_str", ""),
@@ -103,6 +104,10 @@ def main(argv=None) -> int:
                     help="fluid SVG width (100%% of container up to natural size; "
                          "scales down gracefully on mobile)")
     ap.add_argument("--no-ruler", action="store_true", help="omit byte ruler")
+    ap.add_argument("--bare", action="store_true",
+                    help="just the bar: no title, labels, ruler, cache lines, notes, "
+                         "arrows, margins or background (for composing into a "
+                         "larger figure; slot x = offset * px-per-byte)")
     ap.add_argument("--padding-callout", action="store_true",
                     help="add a 'N of M bytes are padding' line")
     ap.add_argument("--jemalloc-slack", action="store_true",
@@ -149,6 +154,7 @@ def main(argv=None) -> int:
         cache_line=args.cache_line,
         jemalloc_slack=args.jemalloc_slack,
         px_per_byte=args.px_per_byte,
+        bare=args.bare,
     )
 
     multi = len(layouts) > 1

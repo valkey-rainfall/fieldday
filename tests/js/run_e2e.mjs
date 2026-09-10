@@ -92,6 +92,45 @@ try {
     return window.fieldday.getMode() === "json" && svg.includes("from the JSON pane");
   });
   if (!jsonModeOk) failures.push("JSON mode did not render hand-edited layout");
+
+  // 6. roles textarea + bare checkbox drive the render (and bare greys the
+  //    controls it overrides). Step 5 left the JSON pane dirty, so leaving
+  //    JSON mode asks for confirmation -- accept it.
+  page.on("dialog", (d) => d.accept());
+  const rolesBareOk = await page.evaluate(async () => {
+    window.fieldday.setMode("c");
+    window.fieldday.setSnippet("struct p { char *ptr; long n; double d; };");
+    const set = (id, v, ev) => {
+      const el = document.getElementById(id);
+      el[typeof v === "boolean" ? "checked" : "value"] = v;
+      el.dispatchEvent(new Event(ev, { bubbles: true }));
+    };
+    const settle = () => new Promise((r) => setTimeout(r, 350));
+    set("roles", "n | overhead\nd | data", "input");
+    await settle();
+    const preview = document.getElementById("preview");
+    const roled = preview.innerHTML.includes('class="fd-role-pointer"') &&
+      preview.innerHTML.includes('class="fd-role-overhead"') &&
+      preview.innerHTML.includes('class="fd-role-data"') &&
+      preview.innerHTML.includes("<text");
+    set("bare", true, "change");
+    await settle();
+    const body = preview.innerHTML.split("</style>")[1] || "";
+    const bare = !body.includes("<text") && !body.includes('class="fd-ruler-line"') &&
+      body.includes('class="fd-role-overhead"') && document.getElementById("ruler").disabled;
+    set("bare", false, "change");
+    await settle();
+    const restored = !document.getElementById("ruler").disabled &&
+      preview.innerHTML.includes('class="fd-ruler-line"');
+    set("roles", "n | wat", "input");
+    await settle();
+    const badRole = !document.getElementById("error").hidden &&
+      document.getElementById("error").textContent.includes("bad role 'wat'");
+    return { roled, bare, restored, badRole };
+  });
+  for (const [k, v] of Object.entries(rolesBareOk)) {
+    if (!v) failures.push(`roles/bare UI check failed: ${k}`);
+  }
 } finally {
   await browser.close();
   server.close();
@@ -101,4 +140,4 @@ if (failures.length) {
   for (const f of failures) console.error("FAIL " + f);
   process.exit(1);
 }
-console.log("e2e: 5 checks passed (boot, render, python parity, error panel, json mode)");
+console.log("e2e: 6 checks passed (boot, render, python parity, error panel, json mode, roles/bare controls)");

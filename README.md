@@ -66,6 +66,7 @@ fieldday client.c --no-ruler          # omit byte rulers
 fieldday client.c --cache-line 0      # disable cache-line rules (default 64)
 fieldday client.c --padding-callout   # add "N of M bytes are padding" note
 fieldday client.c --css mystyle.css   # extra CSS appended into the SVG
+fieldday client.c --bare              # just the bar, for composing (see below)
 ```
 
 Run `fieldday --help` for the full list.
@@ -120,7 +121,8 @@ Struct-level annotation keys:
     {"label": "element sds (16B + hdr)", "bytes": 19, "kind": "embedded"},
     {"label": "out-of-line value", "bytes": 24, "kind": "separate"}
   ],
-  "relabel": {"val_ptr": "*ptr (optional)", "lru": ""}    // rename; "" hides
+  "relabel": {"val_ptr": "*ptr (optional)", "lru": ""},   // rename; "" hides
+  "roles": {"score": "data", "span": "overhead"}          // color by purpose
 }
 ```
 
@@ -128,9 +130,31 @@ Struct-level annotation keys:
   byte ruler continues across them)
 - `separate` extras start a new allocation after a `+` (own 0-based ruler);
   embedded extras listed after a separate one belong to that allocation
+- `roles` colors each member's box by what its bytes are *for*: `pointer`
+  (orange), `overhead` (slate) or `data` (brand blue). Roles are opt-in —
+  with no `roles` key every box keeps the neutral fill. Once any role is
+  set, pointer members default to `pointer`; `none` forces the neutral fill.
+  Boxes get `fd-role-pointer` / `fd-role-overhead` / `fd-role-data` classes
+  and the colors are theme keys (`role-pointer`, ...) and CSS variables
+  (`--fd-role-pointer`, ...) like everything else.
 
 The web app exposes all of this as per-struct form fields (switch structs
 with the picker) and downloads the same JSON.
+
+## Composing figures: `--bare`
+
+`--bare` (web: the *bare bar* checkbox) emits just the bar: no title,
+labels, ruler, cache-line rules, notes, arrows, margins or background. The
+SVG is exactly `bar-height` tall and `bytes × px-per-byte` wide, so a script
+that nests several of them into a larger figure (a tree of nodes, a treemap
+of allocations) knows that member `x = offset × px-per-byte` without parsing
+the SVG — take offsets from `--emit-json`. Array dividers and role colors
+survive; combine with `roles` to show where a node's bytes go.
+
+```
+fieldday node.c --emit-json > node.json      # offsets for edge endpoints
+fieldday --from-json node.json --bare --px-per-byte 2 -o node_bar.svg
+```
 
 ## Theming
 
@@ -141,6 +165,7 @@ Builtin themes: `valkey` (light, default — matches the valkey.io blog) and
 { "background": "#ffffff", "text": "#002a3a", "muted": "#667788",
   "field-fill": "#6983ff", "field-text": "#ffffff", "field-border": "#30176e",
   "padding-fill": "#f5f7f7", "padding-stroke": "#b9c2cc",
+  "role-pointer": "#e07b39", "role-overhead": "#9aa7b5", "role-data": "#6983ff",
   "highlight": "#1e8e3e", "font": "'Fira Mono', monospace" }
 ```
 
