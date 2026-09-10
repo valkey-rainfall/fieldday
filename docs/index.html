@@ -45,6 +45,7 @@
         <label><input type="checkbox" id="responsive"> responsive (fluid width)</label>
         <label><input type="checkbox" id="cacheline" checked> cache-line rules (64B)</label>
         <label><input type="checkbox" id="jemslack"> jemalloc slack</label>
+        <label title="Just the bar: no title, labels, ruler, cache lines, notes, arrows, margins or background. The SVG is exactly bar-height tall and bytes × px/byte wide, so a figure composer nesting it knows slot x = offset × px/byte."><input type="checkbox" id="bare"> bare bar <span class="hint">(no chrome, zero margin &mdash; for composing)</span></label>
       </div>
     </details>
 
@@ -68,6 +69,10 @@
         <label>Relabel members <span class="hint">(one per line: member | new label &mdash; empty label hides it)</span>
           <textarea id="relabel" rows="3" spellcheck="false"
             placeholder="val_ptr | *ptr (optional)&#10;lru |"></textarea>
+        </label>
+        <label>Roles <span class="hint">(one per line: member | pointer / overhead / data / none &mdash; colors the box by what the bytes are for; any line also colors unlisted pointer members as pointers)</span>
+          <textarea id="roles" rows="3" spellcheck="false"
+            placeholder="children | pointer&#10;features | overhead&#10;values | data"></textarea>
         </label>
       </fieldset>
     </details>

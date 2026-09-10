@@ -57,6 +57,10 @@ class StructLayout:
     arrows: list = field(default_factory=list)  # [{from, to}] pointer arrows
                                                 # drawn under the ruler; endpoints
                                                 # are member names or extra labels
+    roles: dict = field(default_factory=dict)  # member -> pointer|overhead|data|none
+                                               # (colors the box by what the bytes
+                                               # are for; any entry also auto-
+                                               # assigns 'pointer' to pointer members)
 
     @property
     def padding_bytes(self) -> int:
@@ -239,6 +243,7 @@ def layouts_to_json(layouts: list[StructLayout]) -> str:
              **({"note_style": s.note_style} if s.note and s.note_style != "plain" else {}),
              **({"title": s.title} if s.title else {}),
              **({"relabel": s.relabel} if s.relabel else {}),
-             **({"arrows": s.arrows} if s.arrows else {})}
+             **({"arrows": s.arrows} if s.arrows else {}),
+             **({"roles": s.roles} if s.roles else {})}
             for s in layouts]},
         indent=2)

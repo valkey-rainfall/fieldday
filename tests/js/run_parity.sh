@@ -24,6 +24,10 @@ pair.structs.forEach((s, i) => writeFileSync('$TMP/js_zsl' + i + '.svg', renderS
 const fbt = JSON.parse(readFileSync('tests/fixtures/fbtree_nodes.json', 'utf8'));
 writeFileSync('$TMP/js_fbt_leaf.svg', renderStruct(fbt.structs[0], { pxPerByte: 1.3 }));
 writeFileSync('$TMP/js_fbt_inner.svg', renderStruct(fbt.structs[1], { pxPerByte: 0.33, cacheLine: 0 }));
+// role fills (auto pointer, explicit, 'none') and bare mode (no chrome, zero margin)
+const roles = JSON.parse(readFileSync('tests/fixtures/roles_bare.json', 'utf8'));
+writeFileSync('$TMP/js_roles.svg', renderStruct(roles.structs[0], { pxPerByte: 10 }));
+writeFileSync('$TMP/js_bare.svg', renderStruct(roles.structs[0], { pxPerByte: 2, bare: true }));
 "
 
 "$PY" - <<EOF
@@ -43,10 +47,13 @@ open("$TMP/py_slack.svg", "w").write(render_struct(sl, RenderOptions(px_per_byte
 fbt = layouts_from_json(open("tests/fixtures/fbtree_nodes.json").read())
 open("$TMP/py_fbt_leaf.svg", "w").write(render_struct(fbt[0], RenderOptions(px_per_byte=1.3)))
 open("$TMP/py_fbt_inner.svg", "w").write(render_struct(fbt[1], RenderOptions(px_per_byte=0.33, cache_line=0)))
+roles = layouts_from_json(open("tests/fixtures/roles_bare.json").read())[0]
+open("$TMP/py_roles.svg", "w").write(render_struct(roles, RenderOptions(px_per_byte=10)))
+open("$TMP/py_bare.svg", "w").write(render_struct(roles, RenderOptions(px_per_byte=2, bare=True)))
 EOF
 
 fail=0
-for p in robj_90 robj_91 zsl0 zsl1 e594_0 e594_1 slack fbt_leaf fbt_inner; do
+for p in robj_90 robj_91 zsl0 zsl1 e594_0 e594_1 slack fbt_leaf fbt_inner roles bare; do
   if cmp -s "$TMP/py_$p.svg" "$TMP/js_$p.svg"; then
     echo "parity $p: identical"
   else

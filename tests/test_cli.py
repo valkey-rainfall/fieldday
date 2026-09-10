@@ -108,3 +108,28 @@ def test_snippet_error_exits(tmp_path):
     p.write_text("struct p { wat w; };")
     with pytest.raises(SystemExit, match="Unknown type"):
         main([str(p)])
+
+
+def test_bare_flag(cfile, tmp_path):
+    out = tmp_path / "bare.svg"
+    main([str(cfile), "--bare", "--px-per-byte", "2", "-o", str(out)])
+    svg = out.read_text()
+    assert 'viewBox="0 0 ' in svg and svg.count("\n<svg") == 0
+    assert "<text" not in svg.split("</style>")[1]
+    assert 'class="fd-background"' not in svg.split("</style>")[1]
+
+
+def test_roles_from_json(tmp_path):
+    layout = tmp_path / "l.json"
+    layout.write_text(json.dumps({"structs": [{
+        "name": "r", "size": 16, "align": 8,
+        "fields": [{"name": "p", "offset": 0, "size": 8, "is_pointer": True},
+                   {"name": "n", "offset": 8, "size": 8}],
+        "roles": {"n": "overhead"}}]}))
+    out = tmp_path / "r.svg"
+    main(["--from-json", str(layout), "-o", str(out)])
+    svg = out.read_text()
+    assert 'class="fd-role-pointer"' in svg and 'class="fd-role-overhead"' in svg
+    # dark theme carries role colors too
+    main(["--from-json", str(layout), "--theme", "dark", "-o", str(out)])
+    assert 'class="fd-role-overhead" fill="#6c7a89"' in out.read_text()

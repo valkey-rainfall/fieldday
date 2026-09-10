@@ -1,7 +1,7 @@
 /* fieldday web app: live editor -> layout.js -> render.js -> inline SVG. */
 
 import { computeLayouts, LayoutError } from "./layout.js";
-import { renderStruct, THEMES, DEFAULT_THEME } from "./render.js";
+import { renderStruct, THEMES, DEFAULT_THEME, ROLES } from "./render.js";
 import { makeEditor } from "./editor.js";
 
 const $ = (id) => document.getElementById(id);
@@ -77,6 +77,14 @@ const EXAMPLE_ANNOTATIONS = {
       relabel: "",
     },
   },
+  "Valkey zskiplistNode": {
+    zskiplistNode: {
+      // backward is a probed pointer, so it colors itself once any role is
+      // set; ele is an sds stub (opaque 8 B) so it has to be named; the
+      // score is the only user data in the node
+      roles: "ele | pointer\nscore | data",
+    },
+  },
 };
 
 function themeCssTemplate(themeName) {
@@ -98,27 +106,19 @@ function syncCssBox() {
 
 let layouts = [];          // last successful computeLayouts result
 let currentSvgs = [];      // [{name, svg}] from last render
-let annStore = {};         // struct name -> {title, note, extras, relabel}
+let annStore = {};         // struct name -> {title, note, extras, relabel, arrows, roles}
 let annCurrent = null;     // struct name currently shown in the fields
+
+const ANN_FIELDS = ["title", "note", "extras", "relabel", "arrows", "roles"];
 
 function saveAnnFields() {
   if (annCurrent === null) return;
-  annStore[annCurrent] = {
-    title: $("title").value,
-    note: $("note").value,
-    extras: $("extras").value,
-    relabel: $("relabel").value,
-    arrows: $("arrows").value,
-  };
+  annStore[annCurrent] = Object.fromEntries(ANN_FIELDS.map((id) => [id, $(id).value]));
 }
 
 function loadAnnFields(name) {
-  const a = annStore[name] || { title: "", note: "", extras: "", relabel: "", arrows: "" };
-  $("title").value = a.title;
-  $("note").value = a.note;
-  $("extras").value = a.extras;
-  $("relabel").value = a.relabel;
-  $("arrows").value = a.arrows || "";
+  const a = annStore[name] || {};
+  for (const id of ANN_FIELDS) $(id).value = a[id] || "";
   annCurrent = name;
 }
 
@@ -163,6 +163,23 @@ function parseRelabel(text) {
     relabel[member] = line.slice(bar + 1).trim();
   }
   return relabel;
+}
+
+function parseRoles(text) {
+  const roles = {};
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    const bar = line.indexOf("|");
+    const member = bar < 0 ? "" : line.slice(0, bar).trim();
+    const role = bar < 0 ? "" : line.slice(bar + 1).trim().toLowerCase();
+    if (!member || !role) throw new LayoutError(
+      `bad roles line: '${line}' (expected: member | ${ROLES.join("/")}/none)`);
+    if (role !== "none" && !ROLES.includes(role)) throw new LayoutError(
+      `bad role '${role}' for '${member}' (expected: ${ROLES.join("/")}/none)`);
+    roles[member] = role;
+  }
+  return roles;
 }
 
 function parseArrows(text) {
@@ -223,8 +240,16 @@ function options() {
     responsive: $("responsive").checked,
     cacheLine: $("cacheline").checked ? 64 : 0,
     jemallocSlack: $("jemslack").checked,
+    bare: $("bare").checked,
     extraCss: $("customcss").value,
   };
+}
+
+// bare mode is a preset that overrides these; grey them so the UI says so
+const BARE_OVERRIDES = ["ruler", "padcallout", "transparent", "cacheline"];
+function syncBareControls() {
+  const bare = $("bare").checked;
+  for (const id of BARE_OVERRIDES) $(id).disabled = bare;
 }
 
 function annotate(sl) {
@@ -237,6 +262,7 @@ function annotate(sl) {
   copy.extras = parseExtras(a.extras || "");
   copy.relabel = parseRelabel(a.relabel || "");
   copy.arrows = parseArrows(a.arrows || "");
+  copy.roles = parseRoles(a.roles || "");
   return copy;
 }
 
@@ -343,11 +369,12 @@ $("mode-toggle").addEventListener("click", () =>
   setMode(mode === "c" ? "json" : "c"));
 $("theme").addEventListener("change", () => { syncCssBox(); rerender(); });
 for (const id of ["theme", "ppb", "ruler", "padcallout", "transparent",
-                  "responsive", "cacheline", "jemslack"]) {
+                  "responsive", "cacheline", "jemslack", "bare"]) {
   $(id).addEventListener("change", rerender);
   $(id).addEventListener("input", scheduleRender);
 }
-for (const id of ["title", "note", "extras", "relabel", "arrows"]) {
+$("bare").addEventListener("change", syncBareControls);
+for (const id of ANN_FIELDS) {
   $(id).addEventListener("input", () => { saveAnnFields(); scheduleRender(); });
 }
 $("structpick").addEventListener("change", () => {
