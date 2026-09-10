@@ -270,6 +270,53 @@ check("jemalloc_size_class_exhaustive", () => {
   }
 });
 
+check("roles_opt_in_and_pointer_default", () => {
+  // mirrors TestRoles: empty map -> neutral everywhere (even pointers);
+  // any entry -> unlisted pointers default to 'pointer', 'none' clears
+  const snippet = "struct s { char *p; long n; double score; unsigned f : 4; };";
+  const boxes = (svg) => [...svg.split("</style>")[1].matchAll(/<rect class="(fd-[a-z-]+)"/g)]
+    .map((m) => m[1]).filter((c) => c !== "fd-background" && c !== "fd-hatch-background");
+  const plain = computeLayouts(snippet)[0];
+  assert(new Set(boxes(renderStruct(plain))).size === 2, "roles leaked into a role-less render");
+  const sl = computeLayouts(snippet)[0];
+  sl.roles = { n: "overhead", score: "data" };
+  assert(boxes(renderStruct(sl)).join() ===
+    "fd-role-pointer,fd-role-overhead,fd-role-data,fd-field-box,fd-padding-box,fd-padding-box",
+    `got ${boxes(renderStruct(sl)).join()}`);
+  sl.roles = { p: "none", f: "overhead" };
+  assert(boxes(renderStruct(sl))[0] === "fd-field-box", "'none' did not clear the pointer role");
+  assert(boxes(renderStruct(sl)).includes("fd-role-overhead"), "bitfield did not take its role");
+  sl.roles = { n: "wat" };
+  let threw = false;
+  try { renderStruct(sl); } catch (e) { threw = /unknown role 'wat' for member 'n'/.test(e.message); }
+  assert(threw, "unknown role accepted");
+  sl.roles = { n: "overhead" };
+  const themed = renderStruct(sl, { theme: { "role-overhead": "#123456" } });
+  assert(themed.includes('class="fd-role-overhead" fill="#123456"'), "theme override not applied");
+  assert(themed.includes("var(--fd-role-overhead, #123456)"), "css var fallback not themed");
+});
+
+check("bare_is_exactly_the_bar", () => {
+  // mirrors TestBare: zero margin, canvas = bytes * ppb by barHeight, no chrome
+  const sl = computeLayouts("struct s { char *p; long n; double d[3]; };")[0];
+  sl.roles = { n: "overhead" };
+  sl.note = "a note";
+  sl.extras = [{ label: "sds", bytes: 20, kind: "separate" }];
+  const svg = renderStruct(sl, { bare: true, pxPerByte: 2, ruler: true, cacheLine: 8,
+                                 title: "hello", margin: 40, paddingCallout: true });
+  // 40 B + 12 B gap floor (24 px at 2 px/B) + 20 B = 72 B -> 144 px
+  assert(svg.includes('viewBox="0 0 144 56" width="144" height="56"'), "canvas is not the bare bar");
+  const body = svg.split("</style>")[1];
+  assert(!body.includes("<text"), "text survived bare mode");
+  for (const cls of ["fd-background", "fd-ruler-line", "fd-cache-line", "fd-note", "fd-allocation-plus"]) {
+    assert(!body.includes(`class="${cls}"`), `${cls} survived bare mode`);
+  }
+  const xs = [...body.matchAll(/<rect class="fd-(?:role-[a-z]+|field-box)"[^>]*? x="([\d.]+)" y="([\d.]+)"/g)];
+  assert(xs.every((m) => m[2] === "0.0"), "boxes not at y=0");
+  assert(xs.map((m) => m[1]).slice(0, 3).join() === "0.0,16.0,32.0", "slot x != offset * ppb");
+  assert((body.match(/fd-subdivision-line/g) || []).length === 2, "array dividers dropped");
+});
+
 console.log(`geometry: ${pass} passed, ${fail} failed`);
 if (failures.length) {
   for (const f of failures) console.error("FAIL " + f);

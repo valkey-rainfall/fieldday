@@ -452,3 +452,112 @@ class TestAnnotations:
         assert '<rect class="fd-field-box" fill="#6983ff" stroke="#30176e"' in body
         assert '<rect class="fd-padding-box" fill="url(#fd-hatch)"' in body
         assert 'class="fd-field-label" fill="#ffffff"' in body
+
+
+class TestRoles:
+    """Role fills: opt-in per-member coloring by what the bytes are for."""
+
+    def _layout(self, roles=None):
+        from fieldday.cparse import parse_snippet
+        from fieldday.probe import compute_layouts
+        sl = compute_layouts(parse_snippet(
+            "struct s { char *p; long n; double score; unsigned f : 4; };"))[0]
+        if roles is not None:
+            sl.roles = roles
+        return sl
+
+    @staticmethod
+    def _box_classes(svg):
+        body = svg.split("</style>")[1]
+        return [c for c in re.findall(r'<rect class="(fd-[a-z-]+)"', body)
+                if c not in ("fd-background", "fd-hatch-background")]
+
+    def test_no_roles_is_unchanged(self):
+        # opt-in: an empty map renders every member with the neutral fill,
+        # even pointers (existing diagrams and gallery renders stay identical)
+        svg = render_struct(self._layout(), RenderOptions())
+        assert set(self._box_classes(svg)) == {"fd-field-box", "fd-padding-box"}
+
+    def test_explicit_roles_and_pointer_default(self):
+        svg = render_struct(self._layout({"n": "overhead", "score": "data"}), RenderOptions())
+        # p (pointer, unlisted) -> pointer; n, score explicit; f (unlisted,
+        # not a pointer) -> neutral; the tail padding stays hatched
+        assert self._box_classes(svg) == [
+            "fd-role-pointer", "fd-role-overhead", "fd-role-data",
+            "fd-field-box", "fd-padding-box", "fd-padding-box"]
+
+    def test_none_forces_neutral_on_a_pointer(self):
+        svg = render_struct(self._layout({"p": "none", "f": "overhead"}), RenderOptions())
+        assert self._box_classes(svg)[0] == "fd-field-box"
+        assert "fd-role-overhead" in self._box_classes(svg)  # bitfields take roles too
+
+    def test_unknown_role_rejected(self):
+        with pytest.raises(ValueError, match="unknown role 'wat' for member 'n'"):
+            render_struct(self._layout({"n": "wat"}), RenderOptions())
+
+    def test_role_theme_keys_and_presentation_attrs(self):
+        svg = render_struct(self._layout({"n": "overhead"}), RenderOptions())
+        style, body = svg.split("</style>")
+        for role, hexv in (("pointer", "#e07b39"), ("overhead", "#9aa7b5"), ("data", "#6983ff")):
+            assert f".fd-role-{role}" in style
+            assert f"var(--fd-role-{role}, {hexv})" in style
+        # non-browser rasterizers see the fill as a presentation attribute
+        assert '<rect class="fd-role-pointer" fill="#e07b39" stroke="#30176e"' in body
+        assert '<rect class="fd-role-overhead" fill="#9aa7b5" stroke="#30176e"' in body
+        # a theme override flows into both the style rule and the attribute
+        themed = render_struct(self._layout({"n": "overhead"}),
+                               RenderOptions(theme={"role-overhead": "#123456"}))
+        assert 'class="fd-role-overhead" fill="#123456"' in themed
+        assert "var(--fd-role-overhead, #123456)" in themed
+
+    def test_roles_round_trip_json(self):
+        from fieldday.cli import layouts_from_json
+        from fieldday.probe import layouts_to_json
+        sl = self._layout({"n": "overhead"})
+        back = layouts_from_json(layouts_to_json([sl]))[0]
+        assert back.roles == {"n": "overhead"}
+        assert '"roles"' not in layouts_to_json([self._layout()])  # omitted when empty
+
+
+class TestBare:
+    """Bare mode: the bar alone, zero margin, sized exactly to the bytes."""
+
+    def _layout(self):
+        from fieldday.cli import layouts_from_json
+        from pathlib import Path
+        return layouts_from_json(
+            (Path(__file__).parent / "fixtures" / "roles_bare.json").read_text())[0]
+
+    def test_canvas_is_exactly_the_bar(self):
+        svg = render_struct(self._layout(), RenderOptions(bare=True, px_per_byte=2))
+        # 48 B struct + 24 px gap floor (12 B at 2 px/B) + 20 B extra = 80 B -> 160 px
+        assert 'viewBox="0 0 160 56" width="160" height="56"' in svg
+        body = svg.split("</style>")[1]
+        boxes = re.findall(r'<rect class="fd-(?:role-[a-z]+|field-box|padding-box|extra-box)"'
+                           r'[^>]*? x="([\d.]+)" y="([\d.]+)" width="([\d.]+)"', body)
+        assert all(float(y) == 0.0 for _, y, _ in boxes)
+        # slot x is offset * px_per_byte with no margin: next@0, owner@8, count@16, ...
+        assert [float(x) for x, _, _ in boxes][:4] == [0.0, 16.0, 32.0, 40.0]
+
+    def test_all_chrome_suppressed(self):
+        sl = self._layout()
+        svg = render_struct(sl, RenderOptions(bare=True, px_per_byte=10, padding_callout=True))
+        body = svg.split("</style>")[1]
+        assert "<text" not in body                      # no title, labels, ruler numbers, note, '+'
+        for cls in ("fd-background", "fd-ruler-line", "fd-cache-line", "fd-leader-line",
+                    "fd-pointer-arrow", "fd-note", "fd-allocation-plus", "fd-title"):
+            assert f'class="{cls}"' not in body, cls
+        # boxes, roles, hatch and slot dividers survive
+        assert 'class="fd-role-pointer"' in body
+        assert 'class="fd-padding-box"' in body
+        assert body.count('class="fd-subdivision-line"') == 3
+        # the labeled render of the same layout does have all of that
+        full = render_struct(sl, RenderOptions(px_per_byte=10)).split("</style>")[1]
+        assert "<text" in full and 'class="fd-pointer-arrow"' in full
+
+    def test_bare_ignores_conflicting_options(self):
+        # bare is a preset: explicit ruler/cache-line/title/margin are overridden
+        svg = render_struct(self._layout(), RenderOptions(
+            bare=True, px_per_byte=2, ruler=True, cache_line=8, title="hello", margin=40))
+        assert 'viewBox="0 0 160 56"' in svg
+        assert "hello" not in svg.split("</style>")[1]
