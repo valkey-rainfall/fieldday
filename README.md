@@ -122,7 +122,7 @@ Struct-level annotation keys:
     {"label": "out-of-line value", "bytes": 24, "kind": "separate"}
   ],
   "relabel": {"val_ptr": "*ptr (optional)", "lru": "",     // rename; "" hides
-              "level0": "level 1\\nforward"},              // "\\n" stacks a two-line label
+              "level0": "level 1\nforward"},                // "\n" stacks a two-line label
   "roles": {"score": "data", "span": "overhead"}          // color by purpose
 }
 ```
