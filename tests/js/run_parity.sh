@@ -28,6 +28,9 @@ writeFileSync('$TMP/js_fbt_inner.svg', renderStruct(fbt.structs[1], { pxPerByte:
 const roles = JSON.parse(readFileSync('tests/fixtures/roles_bare.json', 'utf8'));
 writeFileSync('$TMP/js_roles.svg', renderStruct(roles.structs[0], { pxPerByte: 10 }));
 writeFileSync('$TMP/js_bare.svg', renderStruct(roles.structs[0], { pxPerByte: 2, bare: true }));
+// multi-line labels: inline stacked tspans + a two-line callout (taller band)
+const ml = JSON.parse(readFileSync('tests/fixtures/multiline_labels.json', 'utf8'));
+writeFileSync('$TMP/js_multiline.svg', renderStruct(ml.structs[0], { pxPerByte: 10 }));
 "
 
 "$PY" - <<EOF
@@ -50,10 +53,12 @@ open("$TMP/py_fbt_inner.svg", "w").write(render_struct(fbt[1], RenderOptions(px_
 roles = layouts_from_json(open("tests/fixtures/roles_bare.json").read())[0]
 open("$TMP/py_roles.svg", "w").write(render_struct(roles, RenderOptions(px_per_byte=10)))
 open("$TMP/py_bare.svg", "w").write(render_struct(roles, RenderOptions(px_per_byte=2, bare=True)))
+ml = layouts_from_json(open("tests/fixtures/multiline_labels.json").read())[0]
+open("$TMP/py_multiline.svg", "w").write(render_struct(ml, RenderOptions(px_per_byte=10)))
 EOF
 
 fail=0
-for p in robj_90 robj_91 zsl0 zsl1 e594_0 e594_1 slack fbt_leaf fbt_inner roles bare; do
+for p in robj_90 robj_91 zsl0 zsl1 e594_0 e594_1 slack fbt_leaf fbt_inner roles bare multiline; do
   if cmp -s "$TMP/py_$p.svg" "$TMP/js_$p.svg"; then
     echo "parity $p: identical"
   else

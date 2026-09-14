@@ -1,0 +1,24 @@
+{
+  "structs": [
+    {
+      "name": "lanes",
+      "size": 40,
+      "align": 8,
+      "title": "multi-line label fixture",
+      "fields": [
+        {"name": "score", "offset": 0, "size": 8},
+        {"name": "fwd0", "offset": 8, "size": 8, "is_pointer": true},
+        {"name": "span0", "offset": 16, "size": 8},
+        {"name": "fwd1", "offset": 24, "size": 8, "is_pointer": true},
+        {"name": "tag", "offset": 32, "size": 1},
+        {"name": "pad", "offset": 33, "size": 7, "is_padding": true}
+      ],
+      "relabel": {
+        "fwd0": "level 1\nforward",
+        "span0": "level 1\nspan",
+        "fwd1": "level 2\nforward",
+        "tag": "tiny\ncallout"
+      }
+    }
+  ]
+}

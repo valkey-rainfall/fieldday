@@ -121,7 +121,8 @@ Struct-level annotation keys:
     {"label": "element sds (16B + hdr)", "bytes": 19, "kind": "embedded"},
     {"label": "out-of-line value", "bytes": 24, "kind": "separate"}
   ],
-  "relabel": {"val_ptr": "*ptr (optional)", "lru": ""},   // rename; "" hides
+  "relabel": {"val_ptr": "*ptr (optional)", "lru": "",     // rename; "" hides
+              "level0": "level 1\\nforward"},              // "\\n" stacks a two-line label
   "roles": {"score": "data", "span": "overhead"}          // color by purpose
 }
 ```
