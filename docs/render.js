@@ -9,6 +9,7 @@
  */
 
 export const CHAR_W = 0.62; // monospace width/em estimate
+export const LINE_H = 1.15; // line height (em) for multi-line labels ("\n" in a label)
 
 /** Standard jemalloc small/large size class for an n-byte request
  *  (64-bit, default config). Illustrative: builds can differ. */
@@ -220,7 +221,9 @@ function segmentsFromLayout(sl, opts) {
 
 // ---------------------------------------------------------------- callouts
 
-function textW(s, size) { return s.length * size * CHAR_W; }
+/** Estimated width of a label: its longest line, for multi-line labels. */
+function textW(s, size) { return Math.max(...s.split("\n").map((l) => l.length)) * size * CHAR_W; }
+function nLines(s) { return s.split("\n").length; }
 
 /** Greedy word wrap to fit maxPx at the estimated glyph width. */
 function wrapText(text, size, maxPx) {
@@ -410,9 +413,19 @@ const HATCH = '<defs><pattern id="fd-hatch" width="6" height="6" ' +
   '<rect class="fd-hatch-background" width="6" height="6"/>' +
   '<line class="fd-hatch-lines" x1="0" y1="0" x2="0" y2="6"/></pattern></defs>';
 
+/** One <text>. A label containing "\n" becomes stacked <tspan>s whose LAST
+ * line sits on baseline y, so callers position by the bottom line. */
 function textEl(x, y, s, size, cls, anchor = "middle", weight = "600") {
+  const lines = s.split("\n");
+  if (lines.length === 1) {
+    return `<text class="${cls}" x="${f1(x)}" y="${f1(y)}" font-size="${size}" ` +
+      `font-weight="${weight}" text-anchor="${anchor}">${esc(s)}</text>`;
+  }
+  const lh = size * LINE_H;
+  const body = lines.map((line, i) =>
+    `<tspan x="${f1(x)}" y="${f1(y - (lines.length - 1 - i) * lh)}">${esc(line)}</tspan>`).join("");
   return `<text class="${cls}" x="${f1(x)}" y="${f1(y)}" font-size="${size}" ` +
-    `font-weight="${weight}" text-anchor="${anchor}">${esc(s)}</text>`;
+    `font-weight="${weight}" text-anchor="${anchor}">${body}</text>`;
 }
 
 /** Render one struct layout object to an SVG string.
@@ -446,7 +459,8 @@ export function renderStruct(sl, userOpts = {}) {
   }
   let calloutY = 0;
   if (callouts.length) {
-    calloutY = cy + opts.calloutFontSize;
+    const extraLines = Math.max(...callouts.map((c) => nLines(c.seg.label))) - 1;
+    calloutY = cy + opts.calloutFontSize + Math.round(extraLines * opts.calloutFontSize * LINE_H);
     const maxJog = Math.max(0, ...runs.map(
       (run) => run.filter((c) => Math.abs(c.labelX - c.targetX) > 0.5).length));
     cy = calloutY + 14 + 8 * maxJog;
@@ -529,8 +543,8 @@ export function renderStruct(sl, userOpts = {}) {
     const cls = seg.isSlack ? "fd-slack-label"
       : seg.isPadding ? "fd-padding-label"
       : seg.isExtra ? "fd-callout-label" : "fd-field-label";
-    parts.push(textEl(x, barTop + opts.barHeight / 2 + 5, txt,
-                      opts.fontSize, cls, "middle", "700"));
+    const yLast = barTop + opts.barHeight / 2 + 5 + (nLines(txt) - 1) * opts.fontSize * LINE_H / 2;
+    parts.push(textEl(x, yLast, txt, opts.fontSize, cls, "middle", "700"));
   }
 
   // callouts + leaders

@@ -307,6 +307,32 @@ class TestAnnotations:
         assert "cool label" in svg and "flags!" in svg
         assert ">b<" not in svg and ">f:4<" not in svg
 
+    def test_multiline_inline_label_is_stacked_and_centered(self):
+        # "\n" in a label -> stacked <tspan>s inside the box, the pair centred
+        # on the box's midline (last-line baseline sits half a line lower than
+        # a single-line label would)
+        sl = compute_layouts(parse_snippet("struct s { long a; long b; };"))[0]
+        sl.relabel = {"a": "level 1\nforward", "b": "plain"}
+        opts = RenderOptions(px_per_byte=12)
+        svg = render_struct(sl, opts)
+        assert svg.count("<tspan") == 2 and ">level 1<" in svg and ">forward<" in svg
+        ys = [float(m) for m in re.findall(r'<tspan x="[\d.]+" y="([\d.]+)"', svg)]
+        plain_y = float(re.search(r'<text class="fd-field-label"[^>]*y="([\d.]+)"[^>]*>plain<', svg).group(1))
+        lh = opts.font_size * 1.15
+        assert abs((ys[0] + ys[1]) / 2 - plain_y) < 0.11     # centred on the single-line baseline (.1f output)
+        assert abs(ys[1] - ys[0] - lh) < 0.11
+
+    def test_multiline_callout_label_gets_a_taller_band(self):
+        # a 2-line callout must push the bar down one line so its top line
+        # does not overprint the title
+        sl = compute_layouts(parse_snippet("struct s { char t; long a; };"))[0]
+        one = render_struct(sl, RenderOptions(px_per_byte=10))
+        sl.relabel = {"t": "t\nt"}                              # same width as "t": only the band changes
+        two = render_struct(sl, RenderOptions(px_per_byte=10))
+        bar_y = lambda svg: float(re.search(r'<rect class="fd-field-box"[^>]*y="([\d.]+)"', svg).group(1))
+        assert bar_y(two) - bar_y(one) == 14                  # round(12 px * 1.15)
+        assert two.count("<tspan") == 2
+
     def test_embedded_after_separate_joins_that_allocation(self):
         # embedded | separate | embedded: the trailing embedded item belongs
         # to the separate allocation's ruler; rulers must not overlap

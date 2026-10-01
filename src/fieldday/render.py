@@ -19,6 +19,7 @@ from pathlib import Path
 from .probe import StructLayout, FieldLayout
 
 CHAR_W = 0.62  # monospace width/em estimate
+LINE_H = 1.15  # line height (em) for multi-line labels ("\n" in a label)
 
 
 def jemalloc_size_class(n: int) -> int:
@@ -249,7 +250,12 @@ class Callout:
 
 
 def _text_w(s: str, size: float) -> float:
-    return len(s) * size * CHAR_W
+    """Estimated width of a label: its longest line, for multi-line labels."""
+    return max(len(line) for line in s.split("\n")) * size * CHAR_W
+
+
+def _n_lines(s: str) -> int:
+    return s.count("\n") + 1
 
 
 def _wrap_text(text: str, size: float, max_px: float) -> list:
@@ -420,8 +426,18 @@ HATCH = ('<defs><pattern id="fd-hatch" width="6" height="6" '
 
 
 def _text(x, y, s, size, cls, anchor="middle", weight="600"):
+    """One <text>. A label containing "\n" becomes stacked <tspan>s whose
+    LAST line sits on baseline y, so callers position by the bottom line."""
+    lines = s.split("\n")
+    if len(lines) == 1:
+        return (f'<text class="{cls}" x="{x:.1f}" y="{y:.1f}" font-size="{size}" '
+                f'font-weight="{weight}" text-anchor="{anchor}">{_esc(s)}</text>')
+    lh = size * LINE_H
+    body = "".join(
+        f'<tspan x="{x:.1f}" y="{y - (len(lines) - 1 - i) * lh:.1f}">{_esc(line)}</tspan>'
+        for i, line in enumerate(lines))
     return (f'<text class="{cls}" x="{x:.1f}" y="{y:.1f}" font-size="{size}" '
-            f'font-weight="{weight}" text-anchor="{anchor}">{_esc(s)}</text>')
+            f'font-weight="{weight}" text-anchor="{anchor}">{body}</text>')
 
 
 def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
@@ -452,7 +468,9 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
         cy += 30
     callout_y = 0.0
     if callouts:
-        callout_y = cy + opts.callout_font_size
+        extra_lines = max(_n_lines(c.seg.label) for c in callouts) - 1
+        # whole px, matching JS Math.round, so single-line output is unchanged
+        callout_y = cy + opts.callout_font_size + int(extra_lines * opts.callout_font_size * LINE_H + 0.5)
         cy = callout_y + 14 + 8 * max((len([c for c in run if abs(c.label_x - c.target_x) > 0.5])
                                        for run in runs), default=0)
     bar_top = cy
@@ -526,8 +544,8 @@ def render_struct(sl: StructLayout, opts: RenderOptions | None = None) -> str:
         cls = ("fd-slack-label" if seg.is_slack else
                "fd-padding-label" if seg.is_padding else
                "fd-callout-label" if seg.is_extra else "fd-field-label")
-        parts.append(_text(x, bar_top + opts.bar_height / 2 + 5, txt,
-                           opts.font_size, cls, weight="700"))
+        y_last = bar_top + opts.bar_height / 2 + 5 + (_n_lines(txt) - 1) * opts.font_size * LINE_H / 2
+        parts.append(_text(x, y_last, txt, opts.font_size, cls, weight="700"))
 
     # callouts + leaders
     for c in callouts:
